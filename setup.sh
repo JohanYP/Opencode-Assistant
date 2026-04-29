@@ -49,10 +49,12 @@ ask() {
   local answer
 
   if [[ -n "$default" ]]; then
-    read -rp "$(echo -e "${BOLD}→${NC} $prompt (default: $default): ")" answer
+    echo -ne "${BOLD}→${NC} $prompt (default: $default): " >&2
+    read -r answer < /dev/tty
     echo "${answer:-$default}"
   else
-    read -rp "$(echo -e "${BOLD}→${NC} $prompt: ")" answer
+    echo -ne "${BOLD}→${NC} $prompt: " >&2
+    read -r answer < /dev/tty
     echo "$answer"
   fi
 }
@@ -62,7 +64,8 @@ ask_yn() {
   local default="${2:-S}"
   local answer
 
-  read -rp "$(echo -e "${BOLD}→${NC} $prompt [S/n]: ")" answer
+  echo -ne "${BOLD}→${NC} $prompt [S/n]: " >&2
+  read -r answer < /dev/tty
   answer="${answer:-$default}"
   [[ "${answer,,}" =~ ^(s|y|si|yes)$ ]]
 }
@@ -73,17 +76,21 @@ ask_choice() {
   local options=("$@")
   local choice
 
+  # Print options to stderr so they are visible even when called inside $(...)
   for i in "${!options[@]}"; do
-    echo "  $((i+1))) ${options[$i]}"
+    echo "  $((i+1))) ${options[$i]}" >&2
   done
 
   while true; do
-    read -rp "$(echo -e "${BOLD}→${NC} $prompt: ")" choice
+    # Read from /dev/tty so it works inside $(...) subshells
+    # Prompt goes to stderr so it is always visible
+    echo -ne "${BOLD}→${NC} $prompt [1-${#options[@]}]: " >&2
+    read -r choice < /dev/tty
     if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
       echo "$choice"
       return
     fi
-    echo "  Please enter a number between 1 and ${#options[@]}"
+    echo "  Please enter a number between 1 and ${#options[@]}" >&2
   done
 }
 
