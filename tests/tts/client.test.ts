@@ -1,8 +1,6 @@
-import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSynthesizeSpeech = vi.hoisted(() => vi.fn());
-const mockSpawn = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/utils/logger.js", () => ({
   logger: {
@@ -11,10 +9,6 @@ vi.mock("../../src/utils/logger.js", () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
-}));
-
-vi.mock("node:child_process", () => ({
-  spawn: mockSpawn,
 }));
 
 vi.mock("@google-cloud/text-to-speech", () => {
@@ -83,43 +77,7 @@ import {
   _resetGoogleClient,
   accumulateTtsText,
   flushTtsText,
-  convertMp3ToOggOpus,
 } from "../../src/tts/client.js";
-
-/**
- * Builds a minimal fake ChildProcess that the spawn() mock can return.
- * Tests trigger lifecycle by emitting 'data'/'error'/'close' on the
- * appropriate stream/process emitter.
- */
-function makeFakeFfmpegProcess(): {
-  proc: EventEmitter & {
-    stdout: EventEmitter;
-    stderr: EventEmitter;
-    stdin: EventEmitter & { end: ReturnType<typeof vi.fn> };
-    kill: ReturnType<typeof vi.fn>;
-  };
-  emitOutput: (chunk: Buffer) => void;
-  emitStderr: (text: string) => void;
-  finishOk: () => void;
-  finishWithCode: (code: number) => void;
-  emitSpawnError: (err: Error) => void;
-} {
-  const proc = Object.assign(new EventEmitter(), {
-    stdout: new EventEmitter(),
-    stderr: new EventEmitter(),
-    stdin: Object.assign(new EventEmitter(), { end: vi.fn() }),
-    kill: vi.fn(),
-  });
-
-  return {
-    proc,
-    emitOutput: (chunk) => proc.stdout.emit("data", chunk),
-    emitStderr: (text) => proc.stderr.emit("data", Buffer.from(text)),
-    finishOk: () => proc.emit("close", 0),
-    finishWithCode: (code) => proc.emit("close", code),
-    emitSpawnError: (err) => proc.emit("error", err),
-  };
-}
 
 describe("isTtsConfigured", () => {
   beforeEach(() => {
@@ -562,94 +520,4 @@ describe("accumulateTtsText / flushTtsText", () => {
   });
 });
 
-describe("convertMp3ToOggOpus", () => {
-  beforeEach(() => {
-    mockSpawn.mockReset();
-  });
 
-  it("invokes ffmpeg with the expected libopus / voip flags", async () => {
-    const fake = makeFakeFfmpegProcess();
-    mockSpawn.mockReturnValue(fake.proc);
-
-    const promise = convertMp3ToOggOpus(Buffer.from([0xff, 0xfb, 0x90, 0x44]));
-    fake.emitOutput(Buffer.from("OggS"));
-    fake.finishOk();
-    await promise;
-
-    expect(mockSpawn).toHaveBeenCalledOnce();
-    const [cmd, args] = mockSpawn.mock.calls[0];
-    expect(cmd).toBe("ffmpeg");
-    // Verify the critical flags Telegram needs: Opus codec + OGG container.
-    expect(args).toContain("-c:a");
-    expect(args).toContain("libopus");
-    expect(args).toContain("-f");
-    expect(args).toContain("ogg");
-    // Voice-tuned encoding params.
-    expect(args).toContain("-b:a");
-    expect(args).toContain("32k");
-    expect(args).toContain("-ac");
-    expect(args).toContain("1");
-    expect(args).toContain("-ar");
-    expect(args).toContain("48000");
-    expect(args).toContain("-application");
-    expect(args).toContain("voip");
-  });
-
-  it("writes the input MP3 to ffmpeg's stdin", async () => {
-    const fake = makeFakeFfmpegProcess();
-    mockSpawn.mockReturnValue(fake.proc);
-    const mp3 = Buffer.from([1, 2, 3, 4]);
-
-    const promise = convertMp3ToOggOpus(mp3);
-    fake.emitOutput(Buffer.from("OggS"));
-    fake.finishOk();
-    await promise;
-
-    expect(fake.proc.stdin.end).toHaveBeenCalledWith(mp3);
-  });
-
-  it("resolves with the concatenated stdout buffer on exit code 0", async () => {
-    const fake = makeFakeFfmpegProcess();
-    mockSpawn.mockReturnValue(fake.proc);
-
-    const promise = convertMp3ToOggOpus(Buffer.from([0xff]));
-    fake.emitOutput(Buffer.from([0x4f, 0x67]));
-    fake.emitOutput(Buffer.from([0x67, 0x53]));
-    fake.finishOk();
-
-    const result = await promise;
-    expect(result).toEqual(Buffer.from([0x4f, 0x67, 0x67, 0x53]));
-  });
-
-  it("rejects with stderr context when ffmpeg exits non-zero", async () => {
-    const fake = makeFakeFfmpegProcess();
-    mockSpawn.mockReturnValue(fake.proc);
-
-    const promise = convertMp3ToOggOpus(Buffer.from([0]));
-    fake.emitStderr("Invalid data found when processing input");
-    fake.finishWithCode(1);
-
-    await expect(promise).rejects.toThrow(/exited with code 1.*Invalid data found/);
-  });
-
-  it("rejects when ffmpeg cannot be spawned (ENOENT)", async () => {
-    const fake = makeFakeFfmpegProcess();
-    mockSpawn.mockReturnValue(fake.proc);
-
-    const promise = convertMp3ToOggOpus(Buffer.from([0]));
-    const err = Object.assign(new Error("spawn ffmpeg ENOENT"), { code: "ENOENT" });
-    fake.emitSpawnError(err);
-
-    await expect(promise).rejects.toThrow("spawn ffmpeg ENOENT");
-  });
-
-  it("rejects when ffmpeg produces empty output despite exit code 0", async () => {
-    const fake = makeFakeFfmpegProcess();
-    mockSpawn.mockReturnValue(fake.proc);
-
-    const promise = convertMp3ToOggOpus(Buffer.from([0]));
-    fake.finishOk();
-
-    await expect(promise).rejects.toThrow("empty OGG/Opus output");
-  });
-});
