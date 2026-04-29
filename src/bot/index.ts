@@ -90,6 +90,11 @@ import type { FilePartInput } from "@opencode-ai/sdk/v2";
 import { foregroundSessionState } from "../scheduled-task/foreground-state.js";
 import { scheduledTaskRuntime } from "../scheduled-task/runtime.js";
 import { assistantRunState } from "./assistant-run-state.js";
+import {
+  clearSessionCompletionTasks,
+  enqueueSessionCompletionTask,
+  getSessionCompletionTask,
+} from "./session-task-queue.js";
 import { ResponseStreamer } from "./streaming/response-streamer.js";
 import type { StreamingMessagePayload } from "./streaming/response-streamer.js";
 import { ToolCallStreamer, type ToolStreamKey } from "./streaming/tool-call-streamer.js";
@@ -120,7 +125,6 @@ const SUBAGENT_STREAM_PREFIX = "🧩";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const TEMP_DIR = path.join(__dirname, "..", ".tmp");
-const sessionCompletionTasks = new Map<string, Promise<void>>();
 
 function getCurrentReplyKeyboard() {
   if (!keyboardManager.isInitialized()) {
@@ -151,20 +155,7 @@ function prepareFinalStreamingPayload(messageText: string): StreamingMessagePayl
   return prepareAssistantFinalStreamingPayload(messageText, RESPONSE_STREAM_TEXT_LIMIT);
 }
 
-function enqueueSessionCompletionTask(sessionId: string, task: () => Promise<void>): Promise<void> {
-  const previousTask = sessionCompletionTasks.get(sessionId) ?? Promise.resolve();
-  const nextTask = previousTask
-    .catch(() => undefined)
-    .then(task)
-    .finally(() => {
-      if (sessionCompletionTasks.get(sessionId) === nextTask) {
-        sessionCompletionTasks.delete(sessionId);
-      }
-    });
 
-  sessionCompletionTasks.set(sessionId, nextTask);
-  return nextTask;
-}
 
 const toolMessageBatcher = new ToolMessageBatcher({
   sendText: async (sessionId, text) => {
@@ -802,21 +793,32 @@ async function ensureEventSubscription(directory: string): Promise<void> {
   });
 
   summaryAggregator.setOnSessionIdle(async (sessionId) => {
-    // Send single TTS audio with the last accumulated response text
+    // Enqueue the idle-mode TTS in the same per-session queue used by
+    // onComplete callbacks. Without this, the TTS synthesis + sendVoice
+    // round-trip (~2-4s) for turn N could still be running when turn N+1's
+    // onComplete arrives, so turn N+1's text would reach Telegram before
+    // turn N's audio. The user would see audio appearing one turn late.
+    //
+    // By enqueuing here, the next turn's onComplete handler (which is also
+    // queued on the same key) cannot start delivering text until this
+    // turn's audio is fully sent.
     if (config.tts.waitForIdle && botInstance && chatIdInstance) {
-      const ttsText = flushTtsText(sessionId);
-      if (ttsText) {
+      const api = botInstance.api;
+      const chatId = chatIdInstance;
+      void enqueueSessionCompletionTask(sessionId, async () => {
+        const ttsText = flushTtsText(sessionId);
+        if (!ttsText) return;
         await sendTtsResponseForSession({
-          api: botInstance.api,
+          api,
           sessionId,
-          chatId: chatIdInstance,
+          chatId,
           text: ttsText,
         }).catch((err) => logger.error("[Bot] Failed to send idle TTS audio:", err));
-      }
+      });
     }
 
     await markAttachedSessionIdle(sessionId);
-    await sessionCompletionTasks.get(sessionId)?.catch(() => undefined);
+    await getSessionCompletionTask(sessionId)?.catch(() => undefined);
 
     const completedRun = assistantRunState.finishRun(sessionId, "session_idle");
     clearPromptResponseMode(sessionId);
@@ -990,7 +992,7 @@ async function ensureEventSubscription(directory: string): Promise<void> {
 
 export function createBot(): Bot<Context> {
   clearAllInteractionState("bot_startup");
-  sessionCompletionTasks.clear();
+  clearSessionCompletionTasks();
   attachManager.clear("bot_startup");
   assistantRunState.clearAll("bot_startup");
 
@@ -1442,7 +1444,7 @@ export function cleanupBotRuntime(reason: string): void {
   responseStreamer.clearAll(reason);
   toolCallStreamer.clearAll(reason);
   toolMessageBatcher.clearAll(reason);
-  sessionCompletionTasks.clear();
+  clearSessionCompletionTasks();
   assistantRunState.clearAll(reason);
   clearSessionTracker();
 
