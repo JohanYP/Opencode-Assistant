@@ -1387,7 +1387,11 @@ SUMMARY_EOF
         oc_ready=true
         break
       fi
-      (( attempts++ ))
+      # Pre-increment, NOT post-increment: with `set -e`, `(( attempts++ ))`
+      # returns the value BEFORE incrementing — which is 0 on the first
+      # iteration. An arithmetic command that evaluates to 0 has exit code 1,
+      # so `set -e` would kill the whole script silently right here.
+      (( ++attempts ))
       sleep 2
     done
 
