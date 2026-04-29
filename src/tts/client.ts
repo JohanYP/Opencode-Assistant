@@ -1,8 +1,10 @@
+import { spawn } from "node:child_process";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import textToSpeech from "@google-cloud/text-to-speech";
 
 const TTS_REQUEST_TIMEOUT_MS = 60_000;
+const FFMPEG_TIMEOUT_MS = 30_000;
 
 export interface TtsResult {
   buffer: Buffer;
@@ -283,4 +285,90 @@ export async function synthesizeSpeech(text: string): Promise<TtsResult> {
     }
     throw err;
   }
+}
+
+// --- Audio format conversion (MP3 → OGG/Opus) ---
+
+/**
+ * Converts an MP3 buffer to an OGG/Opus buffer suitable for Telegram's
+ * sendVoice endpoint. Uses ffmpeg via stdin/stdout — no temp files.
+ *
+ * Telegram's sendVoice strictly requires OGG container with Opus codec.
+ * MP3, raw Opus, OGG/Vorbis, etc. all get rejected with HTTP 400.
+ *
+ * Tuned for speech: 32 kbps mono Opus VOIP profile is the standard for
+ * voice notes (compact, intelligible, low latency to encode).
+ *
+ * Throws on:
+ *   - ffmpeg not found in PATH (typical message: "spawn ffmpeg ENOENT")
+ *   - ffmpeg exits with non-zero status (broken input, codec missing, etc.)
+ *   - ffmpeg runs longer than FFMPEG_TIMEOUT_MS (corrupted or huge input)
+ *
+ * The caller (sendTtsResponseForSession) catches these and falls back to
+ * sendAudio with the original MP3 so the user always gets audio.
+ */
+export async function convertMp3ToOggOpus(mp3: Buffer): Promise<Buffer> {
+  return new Promise<Buffer>((resolve, reject) => {
+    const ff = spawn("ffmpeg", [
+      "-loglevel", "error",
+      "-f", "mp3", "-i", "pipe:0",
+      "-c:a", "libopus", "-b:a", "32k", "-ac", "1", "-ar", "48000",
+      "-application", "voip",
+      "-f", "ogg", "pipe:1",
+    ]);
+
+    const chunks: Buffer[] = [];
+    let stderr = "";
+    let settled = false;
+
+    const settle = (fn: () => void) => {
+      if (!settled) {
+        settled = true;
+        fn();
+      }
+    };
+
+    const timer = setTimeout(() => {
+      try {
+        ff.kill("SIGKILL");
+      } catch {
+        // ignore — already exited
+      }
+      settle(() => reject(new Error(`ffmpeg timed out after ${FFMPEG_TIMEOUT_MS}ms`)));
+    }, FFMPEG_TIMEOUT_MS);
+
+    ff.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
+    ff.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+
+    ff.on("error", (err) => {
+      clearTimeout(timer);
+      settle(() => reject(err));
+    });
+
+    ff.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        settle(() =>
+          reject(new Error(`ffmpeg exited with code ${code}: ${stderr.trim() || "no stderr"}`)),
+        );
+        return;
+      }
+      const output = Buffer.concat(chunks);
+      if (output.length === 0) {
+        settle(() => reject(new Error("ffmpeg produced an empty OGG/Opus output")));
+        return;
+      }
+      settle(() => resolve(output));
+    });
+
+    // Pipe the MP3 input to ffmpeg's stdin. If stdin is closed before
+    // ffmpeg is ready (rare), 'error' fires and we reject above.
+    ff.stdin.on("error", (err) => {
+      clearTimeout(timer);
+      settle(() => reject(err));
+    });
+    ff.stdin.end(mp3);
+  });
 }

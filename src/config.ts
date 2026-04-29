@@ -7,6 +7,7 @@ dotenv.config({ path: runtimePaths.envFilePath, quiet: true });
 
 export type MessageFormatMode = "raw" | "markdown";
 export type TtsProvider = "openai" | "google" | "speechify";
+export type TtsDeliveryMode = "voice" | "audio";
 
 function getEnvVar(key: string, required: boolean = true): string {
   const value = process.env[key];
@@ -93,6 +94,26 @@ function getOptionalTtsProviderEnvVar(key: string, defaultValue: TtsProvider): T
   return defaultValue;
 }
 
+const VALID_TTS_DELIVERY_MODES: TtsDeliveryMode[] = ["voice", "audio"];
+
+function getOptionalTtsDeliveryModeEnvVar(
+  key: string,
+  defaultValue: TtsDeliveryMode,
+): TtsDeliveryMode {
+  const value = getEnvVar(key, false);
+
+  if (!value) {
+    return defaultValue;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (VALID_TTS_DELIVERY_MODES.includes(normalized as TtsDeliveryMode)) {
+    return normalized as TtsDeliveryMode;
+  }
+
+  return defaultValue;
+}
+
 export const config = {
   telegram: {
     token: getEnvVar("TELEGRAM_BOT_TOKEN"),
@@ -156,6 +177,11 @@ export const config = {
       model: getEnvVar("TTS_MODEL", false) || "gpt-4o-mini-tts",
       voice: getEnvVar("TTS_VOICE", false) || defaultVoice,
       waitForIdle: getOptionalBooleanEnvVar("TTS_WAIT_FOR_IDLE", true),
+      // "voice" sends a Telegram voice note (waveform UI, requires OGG/Opus
+      // — we convert MP3 with ffmpeg). "audio" sends a music-player audio
+      // file with the original MP3. If conversion fails in voice mode, the
+      // bot automatically falls back to audio.
+      deliveryMode: getOptionalTtsDeliveryModeEnvVar("TTS_DELIVERY_MODE", "voice"),
     };
   })(),
   memory: {
