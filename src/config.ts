@@ -1,0 +1,170 @@
+import dotenv from "dotenv";
+import { getRuntimePaths } from "./runtime/paths.js";
+import { normalizeLocale, type Locale } from "./i18n/index.js";
+
+const runtimePaths = getRuntimePaths();
+dotenv.config({ path: runtimePaths.envFilePath, quiet: true });
+
+export type MessageFormatMode = "raw" | "markdown";
+export type TtsProvider = "openai" | "google" | "speechify";
+
+function getEnvVar(key: string, required: boolean = true): string {
+  const value = process.env[key];
+  if (required && !value) {
+    throw new Error(
+      `Missing required environment variable: ${key} (expected in ${runtimePaths.envFilePath})`,
+    );
+  }
+  return value || "";
+}
+
+function getOptionalPositiveIntEnvVar(key: string, defaultValue: number): number {
+  const value = getEnvVar(key, false);
+
+  if (!value) {
+    return defaultValue;
+  }
+
+  const parsedValue = Number.parseInt(value, 10);
+  if (Number.isNaN(parsedValue) || parsedValue <= 0) {
+    return defaultValue;
+  }
+
+  return parsedValue;
+}
+
+function getOptionalLocaleEnvVar(key: string, defaultValue: Locale): Locale {
+  const value = getEnvVar(key, false);
+  return normalizeLocale(value, defaultValue);
+}
+
+function getOptionalBooleanEnvVar(key: string, defaultValue: boolean): boolean {
+  const value = getEnvVar(key, false);
+
+  if (!value) {
+    return defaultValue;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return defaultValue;
+}
+
+function getOptionalMessageFormatModeEnvVar(
+  key: string,
+  defaultValue: MessageFormatMode,
+): MessageFormatMode {
+  const value = getEnvVar(key, false);
+
+  if (!value) {
+    return defaultValue;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "raw" || normalized === "markdown") {
+    return normalized;
+  }
+
+  return defaultValue;
+}
+
+const VALID_TTS_PROVIDERS: TtsProvider[] = ["openai", "google", "speechify"];
+
+function getOptionalTtsProviderEnvVar(key: string, defaultValue: TtsProvider): TtsProvider {
+  const value = getEnvVar(key, false);
+
+  if (!value) {
+    return defaultValue;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (VALID_TTS_PROVIDERS.includes(normalized as TtsProvider)) {
+    return normalized as TtsProvider;
+  }
+
+  return defaultValue;
+}
+
+export const config = {
+  telegram: {
+    token: getEnvVar("TELEGRAM_BOT_TOKEN"),
+    allowedUserId: parseInt(getEnvVar("TELEGRAM_ALLOWED_USER_ID"), 10),
+    proxyUrl: getEnvVar("TELEGRAM_PROXY_URL", false),
+  },
+  opencode: {
+    apiUrl: getEnvVar("OPENCODE_API_URL", false) || "http://localhost:4096",
+    username: getEnvVar("OPENCODE_SERVER_USERNAME", false) || "opencode",
+    password: getEnvVar("OPENCODE_SERVER_PASSWORD", false),
+    autoRestartEnabled: getOptionalBooleanEnvVar("OPENCODE_AUTO_RESTART_ENABLED", false),
+    monitorIntervalSec: getOptionalPositiveIntEnvVar("OPENCODE_MONITOR_INTERVAL_SEC", 300),
+    model: {
+      provider: getEnvVar("OPENCODE_MODEL_PROVIDER", true), // Required
+      modelId: getEnvVar("OPENCODE_MODEL_ID", true), // Required
+    },
+  },
+  server: {
+    logLevel: getEnvVar("LOG_LEVEL", false) || "info",
+  },
+  bot: {
+    sessionsListLimit: getOptionalPositiveIntEnvVar("SESSIONS_LIST_LIMIT", 10),
+    projectsListLimit: getOptionalPositiveIntEnvVar("PROJECTS_LIST_LIMIT", 10),
+    commandsListLimit: getOptionalPositiveIntEnvVar("COMMANDS_LIST_LIMIT", 10),
+    taskLimit: getOptionalPositiveIntEnvVar("TASK_LIMIT", 10),
+    scheduledTaskExecutionTimeoutMinutes: getOptionalPositiveIntEnvVar(
+      "SCHEDULED_TASK_EXECUTION_TIMEOUT_MINUTES",
+      120,
+    ),
+    responseStreamThrottleMs: getOptionalPositiveIntEnvVar("RESPONSE_STREAM_THROTTLE_MS", 500),
+    bashToolDisplayMaxLength: getOptionalPositiveIntEnvVar("BASH_TOOL_DISPLAY_MAX_LENGTH", 128),
+    locale: getOptionalLocaleEnvVar("BOT_LOCALE", "en"),
+    hideThinkingMessages: getOptionalBooleanEnvVar("HIDE_THINKING_MESSAGES", true),
+    hideAssistantFooter: getOptionalBooleanEnvVar("HIDE_ASSISTANT_FOOTER", true),
+    hideToolCallMessages: getOptionalBooleanEnvVar("HIDE_TOOL_CALL_MESSAGES", false),
+    hideToolFileMessages: getOptionalBooleanEnvVar("HIDE_TOOL_FILE_MESSAGES", false),
+    messageFormatMode: getOptionalMessageFormatModeEnvVar("MESSAGE_FORMAT_MODE", "markdown"),
+  },
+  files: {
+    maxFileSizeKb: parseInt(getEnvVar("CODE_FILE_MAX_SIZE_KB", false) || "100", 10),
+  },
+  open: {
+    browserRoots: getEnvVar("OPEN_BROWSER_ROOTS", false),
+  },
+  stt: {
+    apiUrl: getEnvVar("STT_API_URL", false),
+    apiKey: getEnvVar("STT_API_KEY", false),
+    model: getEnvVar("STT_MODEL", false) || "whisper-large-v3-turbo",
+    language: getEnvVar("STT_LANGUAGE", false),
+    notePrompt: getEnvVar("STT_NOTE_PROMPT", false),
+    hideRecognizedText: getOptionalBooleanEnvVar("STT_HIDE_RECOGNIZED_TEXT", false),
+  },
+  tts: (() => {
+    const provider = getOptionalTtsProviderEnvVar("TTS_PROVIDER", "openai");
+    const defaultVoice = provider === "google" ? "en-US-Studio-O" : provider === "speechify" ? "henry" : "alloy";
+    return {
+      apiUrl: getEnvVar("TTS_API_URL", false),
+      apiKey: getEnvVar("TTS_API_KEY", false),
+      speechifyApiKey: getEnvVar("SPEECHIFY_API_KEY", false),
+      provider,
+      model: getEnvVar("TTS_MODEL", false) || "gpt-4o-mini-tts",
+      voice: getEnvVar("TTS_VOICE", false) || defaultVoice,
+      waitForIdle: getOptionalBooleanEnvVar("TTS_WAIT_FOR_IDLE", true),
+    };
+  })(),
+  memory: {
+    dir: getEnvVar("MEMORY_DIR", false) || "./memory",
+    injectEnabled: getOptionalBooleanEnvVar("MEMORY_INJECT_ENABLED", true),
+  },
+  cron: {
+    ymlSync: getOptionalBooleanEnvVar("CRON_YML_SYNC", true),
+    backupEnabled: getOptionalBooleanEnvVar("CRON_BACKUP_ENABLED", true),
+    backupSchedule: getEnvVar("CRON_BACKUP_SCHEDULE", false) || "0 0 * * 0",
+  },
+};

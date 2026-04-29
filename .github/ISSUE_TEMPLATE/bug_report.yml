@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible bug
+title: "[Bug]: short summary"
+labels:
+  - bug
+body:
+  - type: textarea
+    id: broken
+    attributes:
+      label: What is broken?
+      placeholder: Describe the problem in one or two short sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      description: Optional
+      multiple: true
+      options:
+        - Linux
+        - macOS
+        - Windows
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context (optional)
+      description: Logs, screenshots, links, related issue/PR.

@@ -1,0 +1,156 @@
+name: Publish
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish from main version bump
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      - name: Show tool versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Determine release state
+        id: determine
+        run: |
+          set -euo pipefail
+
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+          STABLE_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+$'
+          RC_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'
+
+          if [[ "$CURRENT_VERSION" =~ $STABLE_PATTERN ]]; then
+            echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "release_kind=stable" >> "$GITHUB_OUTPUT"
+          elif [[ "$CURRENT_VERSION" =~ $RC_PATTERN ]]; then
+            echo "dist_tag=next" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "release_kind=rc" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported version format: $CURRENT_VERSION"
+            echo "Allowed formats: X.Y.Z and X.Y.Z-rc.N"
+            exit 1
+          fi
+
+          git fetch --tags --force
+          TAG_NAME="v$CURRENT_VERSION"
+          if git tag -l "$TAG_NAME" | grep -q "$TAG_NAME"; then
+            echo "Tag already exists: $TAG_NAME"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Release candidate detected: tag is missing for current package version"
+
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+
+      - name: No release needed
+        if: steps.determine.outputs.should_release != 'true'
+        run: 'echo "Skipping publish: no eligible version bump detected"'
+
+      - name: Ensure npm version is not already published
+        if: steps.determine.outputs.should_release == 'true'
+        run: |
+          set -euo pipefail
+          PACKAGE_NAME="${{ steps.determine.outputs.package_name }}"
+          CURRENT_VERSION="${{ steps.determine.outputs.current_version }}"
+          if npm view "$PACKAGE_NAME@$CURRENT_VERSION" version >/dev/null 2>&1; then
+            echo "Version already exists on npm: $PACKAGE_NAME@$CURRENT_VERSION"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        if: steps.determine.outputs.should_release == 'true'
+        run: npm ci
+
+      - name: Lint
+        if: steps.determine.outputs.should_release == 'true'
+        run: npm run lint
+
+      - name: Build
+        if: steps.determine.outputs.should_release == 'true'
+        run: npm run build
+
+      - name: Test
+        if: steps.determine.outputs.should_release == 'true'
+        run: npm run test
+
+      - name: Generate release notes
+        if: steps.determine.outputs.should_release == 'true'
+        id: notes
+        run: |
+          set -euo pipefail
+          CURRENT_VERSION="${{ steps.determine.outputs.current_version }}"
+          RELEASE_KIND="${{ steps.determine.outputs.release_kind }}"
+          BODY_FILE="$RUNNER_TEMP/release-notes.md"
+          node scripts/generate-release-notes.mjs \
+            --version "$CURRENT_VERSION" \
+            --kind "$RELEASE_KIND" \
+            --repo "$GITHUB_REPOSITORY" \
+            --output "$BODY_FILE"
+
+          echo "body_file=$BODY_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        if: steps.determine.outputs.should_release == 'true'
+        run: |
+          if [ "${{ github.event.repository.private }}" = "true" ]; then
+            echo "Private repository detected: publishing without provenance"
+            npm publish --access public --tag ${{ steps.determine.outputs.dist_tag }}
+          else
+            echo "Public repository detected: publishing with provenance"
+            npm publish --access public --tag ${{ steps.determine.outputs.dist_tag }} --provenance
+          fi
+
+      - name: Create and push git tag
+        if: steps.determine.outputs.should_release == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.determine.outputs.tag_name }}"
+          git push origin "${{ steps.determine.outputs.tag_name }}"
+
+      - name: Create GitHub release
+        if: steps.determine.outputs.should_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.determine.outputs.tag_name }}
+          name: ${{ steps.determine.outputs.tag_name }}
+          body_path: ${{ steps.notes.outputs.body_file }}
+          prerelease: ${{ steps.determine.outputs.is_prerelease == 'true' }}

@@ -1,0 +1,29 @@
+# docker-compose.override.yml
+#
+# This file is loaded automatically by docker compose alongside docker-compose.yml.
+# Use it to customize the setup for your environment without modifying the main file.
+#
+# FULL DOCKER MODE (recommended — VPS, servers, any environment):
+#   docker compose --profile full up -d
+#
+# BOT-ONLY MODE (trusted environments only — your personal PC):
+#   ⚠ WARNING: OpenCode runs on your host machine with access to your file system.
+#   Only use this if you trust the environment.
+#
+#   First, ensure OpenCode is running as a system service (setup.sh does this).
+#   Then run: docker compose up -d
+#   The bot will connect to OpenCode on the host via OPENCODE_API_URL in .env.
+#
+# Customize this file for your specific needs:
+
+# Example: expose a port for debugging
+# services:
+#   bot:
+#     ports:
+#       - "3000:3000"
+
+# Example: add extra environment variables
+# services:
+#   bot:
+#     environment:
+#       - MY_CUSTOM_VAR=value

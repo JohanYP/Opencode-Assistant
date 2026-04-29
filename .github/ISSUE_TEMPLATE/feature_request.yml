@@ -1,0 +1,27 @@
+name: Feature request
+description: Propose a new feature for discussion before implementation
+title: "[Feature]: short summary"
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      placeholder: What problem are you trying to solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      placeholder: What should be added or changed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: done_criteria
+    attributes:
+      label: Done criteria (optional)
+      description: How will we understand that the task is complete?

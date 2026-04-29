@@ -1,0 +1,30 @@
+services:
+  # OpenCode server — only included in full Docker mode
+  opencode:
+    image: ghcr.io/sst/opencode:latest
+    command: serve --port 4096
+    volumes:
+      - ./memory:/workspace/memory
+      - opencode-config:/root/.config/opencode
+    restart: unless-stopped
+    profiles:
+      - full
+
+  # Telegram bot — always included
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      opencode:
+        condition: service_started
+        required: false
+    volumes:
+      - ./memory:/app/memory
+      - bot-data:/app/data
+    env_file: .env
+    restart: unless-stopped
+
+volumes:
+  opencode-config:
+  bot-data:

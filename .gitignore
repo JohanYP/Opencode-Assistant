@@ -1,0 +1,43 @@
+# Node
+node_modules/
+dist/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local AI tooling
+.claude/
+.kilocode/
+.opencode/
+opencode.json
+
+# Project specific
+logs/
+run/
+settings.json
+.tmp/
+
+# Packaging artifacts
+*.tgz
+
+# Memory backups (runtime generated)
+memory/backups/*/
+
+# Keep memory structure but not personal data
+# (uncomment the lines below if you want to exclude personal memory files)
+# memory/memory.md
+# memory/context.md

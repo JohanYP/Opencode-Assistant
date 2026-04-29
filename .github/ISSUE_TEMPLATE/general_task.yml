@@ -1,0 +1,11 @@
+name: General task
+description: Open a flexible task for community coordination
+title: "[Task]: short summary"
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+      placeholder: What should be done and what result is expected?
+    validations:
+      required: true

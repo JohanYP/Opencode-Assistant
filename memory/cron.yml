@@ -1,0 +1,35 @@
+# Cron Jobs
+# Define scheduled tasks here. Changes are automatically synced with the bot.
+#
+# Types:
+#   task     — creates an OpenCode session and runs the prompt (default)
+#   reminder — sends a direct Telegram message (no OpenCode session)
+#   backup   — copies memory files to memory/backups/YYYY-MM-DD/
+#
+# Schedule format: standard cron expression (min hour dom month dow)
+#   "0 8 * * *"     = every day at 8:00 AM
+#   "0 18 * * 5"    = every Friday at 6:00 PM
+#   "30 7 * * 1-5"  = weekdays at 7:30 AM
+#
+# Timezone: use IANA timezone names (e.g. America/Bogota, Europe/Madrid, UTC)
+
+crons: []
+
+# Example entries (uncomment to enable):
+#
+#  - id: daily-summary
+#    schedule: "0 8 * * *"
+#    type: task
+#    prompt: "Generate a daily summary using the daily-summary skill"
+#    timezone: "America/Bogota"
+#
+#  - id: morning-reminder
+#    schedule: "30 7 * * 1-5"
+#    type: reminder
+#    message: "Good morning! Check your pending tasks in memory.md"
+#    timezone: "America/Bogota"
+#
+#  - id: weekly-backup
+#    schedule: "0 0 * * 0"
+#    type: backup
+#    timezone: "America/Bogota"
