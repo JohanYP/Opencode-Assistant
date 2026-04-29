@@ -19,6 +19,10 @@ services:
       opencode:
         condition: service_started
         required: false
+    # Allow the bot to reach OpenCode running on the host machine (bot-only mode).
+    # host.docker.internal resolves to the host IP on Linux, macOS and Windows.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./memory:/app/memory
       - bot-data:/app/data

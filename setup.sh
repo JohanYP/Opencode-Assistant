@@ -119,6 +119,32 @@ validate_telegram_token() {
   return 1
 }
 
+# ── Install OpenCode binary ──────────────────────────────────
+install_opencode_binary() {
+  # Method 1: official installer (correct URL)
+  if curl -fsSL https://opencode.ai/install | sh 2>/dev/null; then
+    return 0
+  fi
+
+  # Method 2: npm global install
+  if command -v npm &>/dev/null; then
+    echo "  Trying npm install..."
+    if npm install -g opencode-ai 2>/dev/null; then
+      return 0
+    fi
+  fi
+
+  # Method 3: bun
+  if command -v bun &>/dev/null; then
+    echo "  Trying bun install..."
+    if bun install -g opencode-ai 2>/dev/null; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 # ── Install OpenCode as a system service ────────────────────
 install_opencode_service() {
   local os="$1"
@@ -128,14 +154,37 @@ install_opencode_service() {
   if ! command -v opencode &>/dev/null; then
     echo ""
     echo "  OpenCode is not installed. Installing..."
-    if curl -fsSL https://opencode.ai/install.sh | bash; then
-      print_ok "OpenCode installed"
-      # Reload PATH
-      export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+    if install_opencode_binary; then
+      # Reload PATH — try all known install locations
+      for dir in "$HOME/.local/bin" "$HOME/bin" "$HOME/.bun/bin" \
+                 "/usr/local/bin" "$HOME/.npm-global/bin" \
+                 "$HOME/.nvm/versions/node/$(node -v 2>/dev/null)/bin"; do
+        [[ -d "$dir" ]] && export PATH="$dir:$PATH"
+      done
+      # Source profile to pick up any PATH changes from the installer
+      [[ -f "$HOME/.profile" ]] && source "$HOME/.profile" 2>/dev/null || true
+      [[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc" 2>/dev/null || true
+
+      if command -v opencode &>/dev/null; then
+        print_ok "OpenCode installed: $(command -v opencode)"
+      else
+        print_warn "OpenCode installed but binary not found in PATH."
+        print_warn "You may need to open a new terminal and re-run setup.sh"
+      fi
     else
-      print_err "Failed to install OpenCode automatically."
-      echo "  Please install it manually: https://opencode.ai"
-      exit 1
+      print_err "Automatic installation failed."
+      echo ""
+      echo "  Please install OpenCode manually, then re-run setup.sh:"
+      echo ""
+      echo "    curl -fsSL https://opencode.ai/install | sh"
+      echo "    # or: npm install -g opencode-ai"
+      echo ""
+      echo -ne "${BOLD}→${NC} Is OpenCode installed and working? Continue? [S/n]: "
+      read -r _continue_answer < /dev/tty
+      _continue_answer="${_continue_answer:-S}"
+      if [[ ! "${_continue_answer,,}" =~ ^(s|y|si|yes)$ ]]; then
+        exit 1
+      fi
     fi
   else
     print_ok "OpenCode already installed: $(command -v opencode)"
@@ -402,7 +451,9 @@ main() {
 
   if [[ "$mode_choice" == "2" ]]; then
     install_mode="bot-only"
-    opencode_api_url="http://localhost:4096"
+    # From inside Docker, use host.docker.internal to reach the host machine.
+    # extra_hosts in docker-compose.yml maps this to host-gateway automatically.
+    opencode_api_url="http://host.docker.internal:4096"
 
     echo ""
     echo -e "${YELLOW}${BOLD}  ⚠ WARNING — BOT-ONLY MODE ⚠${NC}"
@@ -853,7 +904,7 @@ TELEGRAM_ALLOWED_USER_ID=${user_id}
 OPENCODE_API_URL=${opencode_api_url}
 OPENCODE_MODEL_PROVIDER=${model_provider}
 OPENCODE_MODEL_ID=${model_id}
-OPENCODE_AUTO_RESTART_ENABLED=$([ "$install_mode" = "full" ] && echo "false" || echo "true")
+OPENCODE_AUTO_RESTART_ENABLED=false
 
 # Bot
 BOT_LOCALE=${bot_locale}
@@ -964,14 +1015,31 @@ SUMMARY_EOF
 
     install_opencode_service "$os"
 
-    # Brief pause to let OpenCode start
-    sleep 2
+    # Wait up to 30s for OpenCode to be ready (poll every 2s)
+    echo "  Waiting for OpenCode to start..."
+    local attempts=0
+    local oc_ready=false
+    while (( attempts < 15 )); do
+      if curl -sf "http://localhost:4096/v1/health" &>/dev/null 2>&1; then
+        oc_ready=true
+        break
+      fi
+      (( attempts++ ))
+      sleep 2
+    done
 
-    # Verify OpenCode is reachable
-    if curl -s "http://localhost:4096/v1/health" &>/dev/null 2>&1; then
+    if [[ "$oc_ready" == "true" ]]; then
       print_ok "OpenCode is running at http://localhost:4096"
     else
-      print_warn "OpenCode may still be starting up. Wait a few seconds and check."
+      print_warn "OpenCode did not respond within 30s."
+      echo "  Check the service status:"
+      echo "    Linux:  systemctl --user status opencode"
+      echo "    macOS:  launchctl list | grep opencode"
+      echo "  View logs:"
+      echo "    Linux:  journalctl --user -u opencode -n 50"
+      echo "    macOS:  cat ~/.opencode/server.log"
+      echo ""
+      print_warn "The bot will still start — it will retry connecting to OpenCode automatically."
     fi
   fi
 
