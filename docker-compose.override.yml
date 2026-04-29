@@ -10,9 +10,23 @@
 #   ⚠ WARNING: OpenCode runs on your host machine with access to your file system.
 #   Only use this if you trust the environment.
 #
-#   First, ensure OpenCode is running as a system service (setup.sh does this).
-#   Then run: docker compose up -d
-#   The bot will connect to OpenCode on the host via OPENCODE_API_URL in .env.
+#   1. Make sure OpenCode is running as a system service. setup.sh installs it
+#      with the equivalent of:
+#         opencode serve --hostname 0.0.0.0 --port 4096
+#      The --hostname 0.0.0.0 is REQUIRED — OpenCode's default is 127.0.0.1,
+#      which is unreachable from inside the bot's Docker container.
+#
+#   2. Verify OpenCode is bound on all interfaces:
+#         ss -tlnp | grep 4096        # should show 0.0.0.0:4096, not 127.0.0.1:4096
+#
+#   3. If UFW is active, allow Docker bridge traffic to the OpenCode port:
+#         sudo ufw allow from 172.17.0.0/16 to any port 4096 proto tcp
+#
+#   4. Set OPENCODE_API_URL=http://host.docker.internal:4096 in .env.
+#      docker-compose.yml maps host.docker.internal to host-gateway automatically.
+#
+#   5. Start the bot only:
+#         docker compose up -d
 #
 # Customize this file for your specific needs:
 

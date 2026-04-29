@@ -17,6 +17,10 @@ ENV_FILE="$SCRIPT_DIR/.env"
 MEMORY_DIR="$SCRIPT_DIR/memory"
 SOUL_FILE="$MEMORY_DIR/soul.md"
 CRON_FILE="$MEMORY_DIR/cron.yml"
+SETUP_LOG="${TMPDIR:-/tmp}/opencode-setup.log"
+
+# Reset log on every run so users can share a fresh one when reporting issues
+: > "$SETUP_LOG"
 
 print_header() {
   echo ""
@@ -119,27 +123,140 @@ validate_telegram_token() {
   return 1
 }
 
+# ── Privilege helpers ───────────────────────────────────────
+is_root() {
+  [[ $EUID -eq 0 ]]
+}
+
+# Returns 0 if we can run privileged commands (root or sudo available).
+# Note: this does NOT prove sudo will succeed — it just checks the binary
+# exists. The actual sudo call may still prompt for a password.
+has_sudo() {
+  is_root && return 0
+  command -v sudo &>/dev/null
+}
+
+# Run a command with root privileges (direct if root, else via sudo).
+run_root() {
+  if is_root; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+# Detect operating system
+detect_os() {
+  case "$(uname -s)" in
+    Linux*)   echo "linux" ;;
+    Darwin*)  echo "macos" ;;
+    *)        echo "unknown" ;;
+  esac
+}
+
+# Refresh PATH with all common install locations OpenCode/npm/bun may use
+reload_install_paths() {
+  local node_version
+  node_version="$(node -v 2>/dev/null || echo "")"
+
+  for dir in \
+    "$HOME/.opencode/bin" \
+    "$HOME/.local/bin" \
+    "$HOME/bin" \
+    "$HOME/.bun/bin" \
+    "/usr/local/bin" \
+    "$HOME/.npm-global/bin" \
+    "$HOME/.nvm/versions/node/${node_version}/bin"; do
+    if [[ -d "$dir" && ":$PATH:" != *":$dir:"* ]]; then
+      export PATH="$dir:$PATH"
+    fi
+  done
+
+  # Best-effort source of common shell rc files (PATH exports may live there)
+  # shellcheck disable=SC1090,SC1091
+  [[ -f "$HOME/.profile" ]] && source "$HOME/.profile" 2>/dev/null || true
+  # shellcheck disable=SC1090,SC1091
+  [[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc" 2>/dev/null || true
+}
+
+# Verify OpenCode binary actually works (in PATH and runs --version cleanly).
+# Returns 0 only when the install is genuinely usable.
+opencode_is_working() {
+  command -v opencode &>/dev/null || return 1
+  # Some installers leave a broken stub; --version must succeed within 5s.
+  timeout 5 opencode --version &>>"$SETUP_LOG"
+}
+
+# Test whether a TCP port is accepting connections. Prefer 'nc' when present;
+# fall back to bash's built-in /dev/tcp pseudo-device which is universally
+# available on bash without extra deps.
+tcp_port_open() {
+  local host="$1"
+  local port="$2"
+
+  if command -v nc &>/dev/null; then
+    nc -z -w2 "$host" "$port" &>/dev/null
+    return $?
+  fi
+
+  # Fallback: bash /dev/tcp (the redirect succeeds only if the port accepts).
+  (timeout 2 bash -c ">/dev/tcp/${host}/${port}") &>/dev/null
+}
+
 # ── Install OpenCode binary ──────────────────────────────────
+# Tries each method in order, verifying the binary actually works after each.
+# All output (including failures) is captured in $SETUP_LOG for debugging.
 install_opencode_binary() {
-  # Method 1: official installer (correct URL)
-  if curl -fsSL https://opencode.ai/install | sh 2>/dev/null; then
-    return 0
+  local method_log
+  method_log="$SETUP_LOG"
+
+  echo "  (full install log: $method_log)"
+
+  # Method 1: official installer
+  echo "  → Trying official installer (https://opencode.ai/install)..."
+  if curl -fsSL https://opencode.ai/install 2>>"$method_log" | sh >>"$method_log" 2>&1; then
+    reload_install_paths
+    if opencode_is_working; then
+      print_ok "Installed via official installer"
+      return 0
+    fi
+    print_warn "Official installer ran but 'opencode --version' failed; trying fallbacks…"
+  else
+    print_warn "Official installer failed; trying fallbacks…"
   fi
 
   # Method 2: npm global install
   if command -v npm &>/dev/null; then
-    echo "  Trying npm install..."
-    if npm install -g opencode-ai 2>/dev/null; then
-      return 0
+    echo "  → Trying npm install -g opencode-ai..."
+    if npm install -g opencode-ai >>"$method_log" 2>&1; then
+      reload_install_paths
+      if opencode_is_working; then
+        print_ok "Installed via npm"
+        return 0
+      fi
+      print_warn "npm install completed but 'opencode --version' failed; trying bun…"
+    else
+      print_warn "npm install failed; trying bun…"
     fi
+  else
+    echo "  (skipping npm — not installed)"
   fi
 
   # Method 3: bun
   if command -v bun &>/dev/null; then
-    echo "  Trying bun install..."
-    if bun install -g opencode-ai 2>/dev/null; then
-      return 0
+    echo "  → Trying bun install -g opencode-ai..."
+    if bun install -g opencode-ai >>"$method_log" 2>&1; then
+      reload_install_paths
+      if opencode_is_working; then
+        print_ok "Installed via bun"
+        return 0
+      fi
+      print_warn "bun install completed but 'opencode --version' failed."
+    else
+      print_warn "bun install failed."
     fi
+  else
+    echo "  (skipping bun — not installed)"
   fi
 
   return 1
@@ -150,34 +267,21 @@ install_opencode_service() {
   local os="$1"
   local user="$USER"
 
-  # Install OpenCode binary if not present
-  if ! command -v opencode &>/dev/null; then
+  # Install OpenCode binary if not present (or broken)
+  if ! opencode_is_working; then
     echo ""
-    echo "  OpenCode is not installed. Installing..."
-    if install_opencode_binary; then
-      # Reload PATH — try all known install locations
-      for dir in "$HOME/.local/bin" "$HOME/bin" "$HOME/.bun/bin" \
-                 "/usr/local/bin" "$HOME/.npm-global/bin" \
-                 "$HOME/.nvm/versions/node/$(node -v 2>/dev/null)/bin"; do
-        [[ -d "$dir" ]] && export PATH="$dir:$PATH"
-      done
-      # Source profile to pick up any PATH changes from the installer
-      [[ -f "$HOME/.profile" ]] && source "$HOME/.profile" 2>/dev/null || true
-      [[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc" 2>/dev/null || true
-
-      if command -v opencode &>/dev/null; then
-        print_ok "OpenCode installed: $(command -v opencode)"
-      else
-        print_warn "OpenCode installed but binary not found in PATH."
-        print_warn "You may need to open a new terminal and re-run setup.sh"
-      fi
+    echo "  OpenCode is not installed (or not working). Installing..."
+    if install_opencode_binary && opencode_is_working; then
+      print_ok "OpenCode installed: $(command -v opencode) ($(opencode --version 2>/dev/null | head -n1))"
     else
       print_err "Automatic installation failed."
       echo ""
+      echo "  Install log saved at: $SETUP_LOG"
       echo "  Please install OpenCode manually, then re-run setup.sh:"
       echo ""
       echo "    curl -fsSL https://opencode.ai/install | sh"
       echo "    # or: npm install -g opencode-ai"
+      echo "    # or: bun install -g opencode-ai"
       echo ""
       echo -ne "${BOLD}→${NC} Is OpenCode installed and working? Continue? [S/n]: "
       read -r _continue_answer < /dev/tty
@@ -200,20 +304,105 @@ install_opencode_service() {
   fi
 }
 
+# Extract port from a URL such as http://host:4096 or http://host (default 4096).
+# Used to keep the systemd unit in sync with OPENCODE_API_URL in .env.
+parse_port_from_url() {
+  local url="$1"
+  local port=""
+  # Match :PORT before the first / or end of string after host
+  port="$(echo "$url" | sed -nE 's|^[a-zA-Z][a-zA-Z0-9+.-]*://[^/:]+:([0-9]+).*|\1|p')"
+  if [[ -z "$port" ]]; then
+    port="4096"
+  fi
+  echo "$port"
+}
+
+# Read OPENCODE_API_URL from .env (if present) and extract the port.
+# Falls back to 4096 when the .env file or variable is missing.
+read_opencode_port_from_env() {
+  if [[ -f "$ENV_FILE" ]]; then
+    local url
+    url="$(grep -E '^OPENCODE_API_URL=' "$ENV_FILE" | head -n1 | cut -d= -f2-)"
+    if [[ -n "$url" ]]; then
+      parse_port_from_url "$url"
+      return
+    fi
+  fi
+  echo "4096"
+}
+
 install_opencode_systemd() {
   local user="$1"
   local opencode_bin
   opencode_bin="$(command -v opencode)"
-  local service_file="/etc/systemd/system/opencode.service"
+
+  local opencode_port
+  opencode_port="$(read_opencode_port_from_env)"
+
+  # Bot-only mode means the bot runs in Docker and OpenCode runs on the host.
+  # The default OpenCode bind address is 127.0.0.1, which is unreachable from
+  # inside the Docker bridge network — so we must bind to 0.0.0.0.
+  # SECURITY: 0.0.0.0 also exposes the server to the local network. The user
+  # is warned at the end of bot-only setup.
+  local opencode_hostname="0.0.0.0"
 
   echo ""
-  echo "  Creating systemd service for OpenCode..."
+  echo "  Creating systemd service for OpenCode (port=${opencode_port}, bind=${opencode_hostname})..."
 
-  if [[ $EUID -ne 0 ]]; then
-    # Use user systemd if not root
+  if has_sudo; then
+    # Preferred path: system-level unit. Survives logout, starts at boot,
+    # works on headless servers/VPS without lingering.
+    local service_file="/etc/systemd/system/opencode.service"
+    local home_dir
+    if is_root; then
+      home_dir="/home/${user}"
+      [[ -d "$home_dir" ]] || home_dir="/root"
+    else
+      home_dir="$HOME"
+    fi
+
+    local tmp_unit
+    tmp_unit="$(mktemp)"
+    cat > "$tmp_unit" << EOF
+[Unit]
+Description=OpenCode Server
+After=network.target
+
+[Service]
+Type=simple
+User=${user}
+ExecStart=${opencode_bin} serve --hostname ${opencode_hostname} --port ${opencode_port}
+Restart=always
+RestartSec=5
+Environment=HOME=${home_dir}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    if ! run_root install -m 0644 "$tmp_unit" "$service_file" 2>>"$SETUP_LOG"; then
+      rm -f "$tmp_unit"
+      print_err "Failed to write $service_file (see $SETUP_LOG)."
+      return 1
+    fi
+    rm -f "$tmp_unit"
+
+    run_root systemctl daemon-reload
+    run_root systemctl enable opencode >>"$SETUP_LOG" 2>&1
+    run_root systemctl restart opencode >>"$SETUP_LOG" 2>&1
+
+    print_ok "OpenCode system service installed at $service_file"
+    print_ok "OpenCode will start automatically on boot"
+  else
+    # Fallback: user-level unit. Without lingering, this only runs while the
+    # user is logged in — not ideal for headless servers.
+    print_warn "sudo not available; falling back to a user-level systemd service."
+    print_warn "On headless servers this may stop when you log out. To make it"
+    print_warn "persist: enable lingering with 'sudo loginctl enable-linger ${user}'."
+
     local user_service_dir="$HOME/.config/systemd/user"
     mkdir -p "$user_service_dir"
-    service_file="$user_service_dir/opencode.service"
+    local service_file="$user_service_dir/opencode.service"
 
     cat > "$service_file" << EOF
 [Unit]
@@ -222,7 +411,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=${opencode_bin} serve --port 4096
+ExecStart=${opencode_bin} serve --hostname ${opencode_hostname} --port ${opencode_port}
 Restart=always
 RestartSec=5
 Environment=HOME=${HOME}
@@ -232,42 +421,20 @@ WantedBy=default.target
 EOF
 
     systemctl --user daemon-reload
-    systemctl --user enable opencode
-    systemctl --user start opencode
-    print_ok "OpenCode user service installed and started"
-    print_ok "OpenCode will start automatically when you log in"
-  else
-    cat > "$service_file" << EOF
-[Unit]
-Description=OpenCode Server
-After=network.target
-
-[Service]
-Type=simple
-User=${user}
-ExecStart=${opencode_bin} serve --port 4096
-Restart=always
-RestartSec=5
-Environment=HOME=/home/${user}
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    systemctl daemon-reload
-    systemctl enable opencode
-    systemctl start opencode
-    print_ok "OpenCode system service installed and started"
-    print_ok "OpenCode will start automatically on boot"
+    systemctl --user enable opencode >>"$SETUP_LOG" 2>&1
+    systemctl --user restart opencode >>"$SETUP_LOG" 2>&1
+    print_ok "OpenCode user service installed at $service_file"
   fi
 }
 
 install_opencode_launchd() {
   local opencode_bin
   opencode_bin="$(command -v opencode)"
+  local opencode_port
+  opencode_port="$(read_opencode_port_from_env)"
   local plist="$HOME/Library/LaunchAgents/ai.opencode.server.plist"
 
-  mkdir -p "$HOME/Library/LaunchAgents"
+  mkdir -p "$HOME/Library/LaunchAgents" "$HOME/.opencode"
 
   cat > "$plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -281,8 +448,10 @@ install_opencode_launchd() {
   <array>
     <string>${opencode_bin}</string>
     <string>serve</string>
+    <string>--hostname</string>
+    <string>0.0.0.0</string>
     <string>--port</string>
-    <string>4096</string>
+    <string>${opencode_port}</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -296,8 +465,10 @@ install_opencode_launchd() {
 </plist>
 EOF
 
+  # Reload (unload then load) so config changes are picked up on re-runs.
+  launchctl unload "$plist" 2>/dev/null || true
   launchctl load "$plist" 2>/dev/null || true
-  print_ok "OpenCode LaunchAgent installed and started"
+  print_ok "OpenCode LaunchAgent installed and started (port=${opencode_port})"
   print_ok "OpenCode will start automatically on login"
 }
 
@@ -389,6 +560,207 @@ crons: []
 EOF
 }
 
+# ── Detect Linux package manager ────────────────────────────
+detect_pkg_manager() {
+  if command -v apt-get &>/dev/null; then echo "apt"
+  elif command -v dnf &>/dev/null; then echo "dnf"
+  elif command -v yum &>/dev/null; then echo "yum"
+  elif command -v pacman &>/dev/null; then echo "pacman"
+  elif command -v zypper &>/dev/null; then echo "zypper"
+  else echo "unknown"
+  fi
+}
+
+# ── Install Docker on Linux via the official convenience script ────
+install_docker_linux() {
+  echo ""
+  echo "  Docker not found. The official installer will be used:"
+  echo "    https://get.docker.com"
+  echo ""
+  if ! has_sudo; then
+    print_err "Cannot install Docker without sudo or root privileges."
+    echo "  Please install Docker manually: https://docs.docker.com/engine/install/"
+    return 1
+  fi
+
+  echo "  This will request sudo to install the Docker Engine + Compose v2 plugin."
+  if ! ask_yn "Install Docker now?"; then
+    return 1
+  fi
+
+  if ! curl -fsSL https://get.docker.com -o "$SETUP_LOG.docker.sh" 2>>"$SETUP_LOG"; then
+    print_err "Failed to download Docker installer."
+    return 1
+  fi
+
+  if ! run_root sh "$SETUP_LOG.docker.sh" >>"$SETUP_LOG" 2>&1; then
+    print_err "Docker installer failed (see $SETUP_LOG)."
+    rm -f "$SETUP_LOG.docker.sh"
+    return 1
+  fi
+  rm -f "$SETUP_LOG.docker.sh"
+
+  # Add the current user to the docker group so we can run without sudo.
+  if ! is_root; then
+    if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
+      run_root usermod -aG docker "$USER" 2>>"$SETUP_LOG" || true
+      print_warn "Added $USER to the 'docker' group."
+      print_warn "Group membership only takes effect in NEW shells."
+      print_warn "Once setup finishes, log out and back in (or run 'newgrp docker')"
+      print_warn "to use 'docker' without sudo."
+    fi
+  fi
+
+  return 0
+}
+
+# ── Install the docker compose v2 plugin if missing ────────
+install_compose_plugin_linux() {
+  local pm
+  pm="$(detect_pkg_manager)"
+
+  if ! has_sudo; then
+    print_err "Cannot install docker-compose-plugin without sudo or root."
+    return 1
+  fi
+
+  case "$pm" in
+    apt)
+      run_root apt-get update >>"$SETUP_LOG" 2>&1 || true
+      run_root apt-get install -y docker-compose-plugin >>"$SETUP_LOG" 2>&1
+      ;;
+    dnf|yum)
+      run_root "$pm" install -y docker-compose-plugin >>"$SETUP_LOG" 2>&1
+      ;;
+    pacman)
+      run_root pacman -Sy --noconfirm docker-compose >>"$SETUP_LOG" 2>&1
+      ;;
+    zypper)
+      run_root zypper install -y docker-compose >>"$SETUP_LOG" 2>&1
+      ;;
+    *)
+      print_err "Unknown package manager. Install docker-compose-plugin manually."
+      return 1
+      ;;
+  esac
+}
+
+# ── Ensure docker daemon is reachable ───────────────────────
+docker_can_connect() {
+  docker info &>/dev/null
+}
+
+# ── Ensure all required dependencies are installed ─────────
+ensure_dependencies() {
+  local os
+  os="$(detect_os)"
+
+  # curl is required to download installers / call Telegram API
+  if ! command -v curl &>/dev/null; then
+    print_err "Required dependency not found: curl"
+    echo "  curl is required to download installers and validate the bot token."
+    case "$os" in
+      linux)
+        local pm
+        pm="$(detect_pkg_manager)"
+        if [[ "$pm" != "unknown" ]] && has_sudo; then
+          if ask_yn "Install curl now (via $pm)?"; then
+            case "$pm" in
+              apt)        run_root apt-get update >>"$SETUP_LOG" 2>&1 && run_root apt-get install -y curl ;;
+              dnf|yum)    run_root "$pm" install -y curl ;;
+              pacman)     run_root pacman -Sy --noconfirm curl ;;
+              zypper)     run_root zypper install -y curl ;;
+            esac
+          fi
+        fi
+        ;;
+      *)
+        echo "  Install curl and run setup.sh again."
+        ;;
+    esac
+    if ! command -v curl &>/dev/null; then
+      exit 1
+    fi
+  fi
+
+  # Docker engine
+  if ! command -v docker &>/dev/null; then
+    case "$os" in
+      linux)
+        if ! install_docker_linux; then
+          print_err "Docker installation failed or skipped."
+          echo "  Install Docker manually and re-run setup.sh:"
+          echo "    https://docs.docker.com/engine/install/"
+          exit 1
+        fi
+        ;;
+      macos)
+        print_err "Docker not found."
+        echo "  On macOS, install Docker Desktop (or OrbStack):"
+        echo "    https://www.docker.com/products/docker-desktop/"
+        echo "    or:  brew install --cask docker"
+        exit 1
+        ;;
+      *)
+        print_err "Docker not found and automatic install is not supported on this OS."
+        echo "  Install Docker manually: https://docs.docker.com/engine/install/"
+        exit 1
+        ;;
+    esac
+  fi
+
+  # Compose v2 plugin
+  if ! docker compose version &>/dev/null 2>&1; then
+    print_warn "docker compose v2 plugin not found."
+    if [[ "$os" == "linux" ]]; then
+      if ask_yn "Install the docker-compose-plugin now?"; then
+        if ! install_compose_plugin_linux; then
+          print_err "Failed to install docker-compose-plugin (see $SETUP_LOG)."
+          echo "  Install manually: https://docs.docker.com/compose/install/linux/"
+          exit 1
+        fi
+      else
+        echo "  Install docker compose v2 manually and re-run setup.sh."
+        exit 1
+      fi
+    else
+      print_err "docker compose v2 is required."
+      echo "  See: https://docs.docker.com/compose/install/"
+      exit 1
+    fi
+
+    if ! docker compose version &>/dev/null 2>&1; then
+      print_err "docker compose v2 still not available after installation."
+      exit 1
+    fi
+  fi
+
+  # Daemon reachability — covers fresh installs where the user is not yet in
+  # the 'docker' group, or the daemon is stopped.
+  if ! docker_can_connect; then
+    if has_sudo && run_root docker info &>/dev/null; then
+      print_warn "Docker daemon is running but the current user cannot reach it."
+      print_warn "You were added to the 'docker' group, but group changes only"
+      print_warn "apply to NEW shells. Log out and back in (or run 'newgrp docker')"
+      print_warn "and then re-run ./setup.sh."
+      exit 1
+    fi
+    # Try to start the daemon (systemd-managed installs)
+    if has_sudo && command -v systemctl &>/dev/null; then
+      run_root systemctl start docker >>"$SETUP_LOG" 2>&1 || true
+      run_root systemctl enable docker >>"$SETUP_LOG" 2>&1 || true
+    fi
+    if ! docker_can_connect; then
+      print_err "Cannot reach the Docker daemon."
+      echo "  Make sure Docker is running and you have permission to use it."
+      echo "  Logs: $SETUP_LOG"
+      exit 1
+    fi
+  fi
+
+  print_ok "Dependencies OK: curl, docker $(docker --version 2>/dev/null | awk '{print $3}' | tr -d ','), compose v2"
+}
+
 # ────────────────────────────────────────────────────────────
 # MAIN WIZARD
 # ────────────────────────────────────────────────────────────
@@ -399,19 +771,7 @@ main() {
   echo "Answer the following questions to configure your assistant."
 
   # ── Check dependencies ───────────────────────────────────
-  for dep in curl docker; do
-    if ! command -v "$dep" &>/dev/null; then
-      print_err "Required dependency not found: $dep"
-      echo "  Please install $dep and run this wizard again."
-      exit 1
-    fi
-  done
-
-  if ! docker compose version &>/dev/null 2>&1; then
-    print_err "docker compose (v2) is required but not found."
-    echo "  Please install Docker with Compose v2: https://docs.docker.com/compose/"
-    exit 1
-  fi
+  ensure_dependencies
 
   # ── Handle existing .env ─────────────────────────────────
   if [[ -f "$ENV_FILE" ]]; then
@@ -1008,19 +1368,22 @@ SUMMARY_EOF
     echo ""
     echo "Installing OpenCode as a system service..."
 
-    local os="linux"
-    if [[ "$(uname)" == "Darwin" ]]; then
-      os="macos"
-    fi
+    local os
+    os="$(detect_os)"
 
     install_opencode_service "$os"
 
-    # Wait up to 30s for OpenCode to be ready (poll every 2s)
-    echo "  Waiting for OpenCode to start..."
+    local opencode_port
+    opencode_port="$(read_opencode_port_from_env)"
+
+    # Wait up to 30s for OpenCode to be listening on the TCP port (poll every 2s).
+    # We use a TCP probe instead of an HTTP health endpoint so this works
+    # regardless of the server's internal route layout.
+    echo "  Waiting for OpenCode to listen on port ${opencode_port}..."
     local attempts=0
     local oc_ready=false
     while (( attempts < 15 )); do
-      if curl -sf "http://localhost:4096/v1/health" &>/dev/null 2>&1; then
+      if tcp_port_open "127.0.0.1" "$opencode_port"; then
         oc_ready=true
         break
       fi
@@ -1029,17 +1392,45 @@ SUMMARY_EOF
     done
 
     if [[ "$oc_ready" == "true" ]]; then
-      print_ok "OpenCode is running at http://localhost:4096"
+      print_ok "OpenCode is listening on 0.0.0.0:${opencode_port}"
     else
-      print_warn "OpenCode did not respond within 30s."
+      print_warn "OpenCode did not start listening within 30s."
       echo "  Check the service status:"
-      echo "    Linux:  systemctl --user status opencode"
-      echo "    macOS:  launchctl list | grep opencode"
-      echo "  View logs:"
-      echo "    Linux:  journalctl --user -u opencode -n 50"
-      echo "    macOS:  cat ~/.opencode/server.log"
+      if has_sudo; then
+        echo "    systemctl status opencode"
+        echo "    journalctl -u opencode -n 50 --no-pager"
+      else
+        echo "    systemctl --user status opencode"
+        echo "    journalctl --user -u opencode -n 50 --no-pager"
+      fi
+      if [[ "$os" == "macos" ]]; then
+        echo "    launchctl list | grep opencode"
+        echo "    cat ~/.opencode/server.log"
+      fi
       echo ""
       print_warn "The bot will still start — it will retry connecting to OpenCode automatically."
+    fi
+
+    # ── Security and connectivity notes for hybrid (bot-only) mode ──
+    echo ""
+    echo -e "${YELLOW}${BOLD}  ⚠ Security notes — hybrid mode${NC}"
+    echo "  OpenCode is bound to 0.0.0.0:${opencode_port} so the bot container"
+    echo "  can reach it via host.docker.internal. This also exposes OpenCode"
+    echo "  to your local network. To harden:"
+    echo "    • Set OPENCODE_SERVER_PASSWORD in .env (and Environment= in the unit)"
+    echo "    • Restrict the port at the firewall level (see below)"
+    echo ""
+
+    # UFW awareness: warn the user if it's active and may block Docker traffic.
+    if [[ "$os" == "linux" ]] && command -v ufw &>/dev/null; then
+      local ufw_status=""
+      ufw_status="$(run_root ufw status 2>/dev/null | head -n1 || true)"
+      if echo "$ufw_status" | grep -qi "Status: active"; then
+        print_warn "UFW is active. If the bot cannot reach OpenCode, allow Docker traffic:"
+        echo "    sudo ufw allow from 172.17.0.0/16 to any port ${opencode_port} proto tcp"
+        echo "  (172.17.0.0/16 is the default 'docker0' bridge subnet — adjust if you"
+        echo "   use a custom network, e.g. 'docker network inspect bridge')"
+      fi
     fi
   fi
 

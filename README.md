@@ -382,6 +382,41 @@ Available scripts:
 - Bot-only: check OpenCode service is running (`systemctl status opencode` or check Activity Monitor on macOS)
 - Verify `OPENCODE_API_URL` is correct for your mode
 
+**Bot-only (hybrid) mode: bot can't reach OpenCode on the host**
+- OpenCode must bind to `0.0.0.0`, not `127.0.0.1`. Check:
+  ```bash
+  ss -tlnp | grep 4096   # expect 0.0.0.0:4096, NOT 127.0.0.1:4096
+  ```
+  If you see `127.0.0.1`, the systemd unit is missing `--hostname 0.0.0.0`. Re-run `./setup.sh` or edit `/etc/systemd/system/opencode.service` (or `~/.config/systemd/user/opencode.service`) and add it to `ExecStart`, then `sudo systemctl daemon-reload && sudo systemctl restart opencode`.
+- If UFW is active, allow Docker bridge traffic:
+  ```bash
+  sudo ufw allow from 172.17.0.0/16 to any port 4096 proto tcp
+  ```
+- Confirm `OPENCODE_API_URL=http://host.docker.internal:4096` is set in `.env`.
+- From inside the bot container, test the connection:
+  ```bash
+  docker compose exec bot sh -c "wget -qO- --timeout=3 http://host.docker.internal:4096/" && echo OK
+  ```
+
+**OpenCode does not start at boot (systemd)**
+- If `setup.sh` ran without sudo, it may have installed only a *user-level* unit. User services don't run on a headless server unless lingering is enabled:
+  ```bash
+  sudo loginctl enable-linger "$USER"
+  ```
+- Better: re-run `./setup.sh` with sudo available so it installs a *system-level* unit at `/etc/systemd/system/opencode.service`, which starts at boot regardless of login state.
+
+**`setup.sh` failed to install Docker or OpenCode**
+- Inspect the install log: `cat /tmp/opencode-setup.log`
+- Manual fallback for OpenCode:
+  ```bash
+  curl -fsSL https://opencode.ai/install | sh
+  # or
+  npm install -g opencode-ai
+  # or
+  bun install -g opencode-ai
+  ```
+- Manual fallback for Docker: https://docs.docker.com/engine/install/
+
 **Memory not injected**
 - Check `MEMORY_INJECT_ENABLED=true` in `.env`
 - Check the `memory/soul.md` file exists and is not empty
