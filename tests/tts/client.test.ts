@@ -29,6 +29,7 @@ vi.mock("@google-cloud/text-to-speech", () => {
 const mockTts = vi.hoisted(() => ({
   apiUrl: "",
   apiKey: "",
+  speechifyApiKey: "",
   provider: "openai" as string,
   model: "gpt-4o-mini-tts",
   voice: "alloy",
@@ -340,6 +341,130 @@ describe("synthesizeSpeech (Google)", () => {
 
     const callArgs = mockSynthesizeSpeech.mock.calls[0];
     expect(callArgs[0].input).toEqual({ text: "Hello bold and code" });
+  });
+});
+
+describe("synthesizeSpeech (Speechify)", () => {
+  beforeEach(() => {
+    mockTts.provider = "speechify";
+    mockTts.speechifyApiKey = "spc-test-key";
+    mockTts.voice = "henry";
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    mockTts.provider = "openai";
+    mockTts.speechifyApiKey = "";
+  });
+
+  // Regression guard for the API rejection bug:
+  //   Speechify returned HTTP 400 "Field voice_id is required" because the
+  //   client sent `voiceId` (camelCase). Speechify uses snake_case.
+  it("sends voice_id (snake_case), NOT voiceId (camelCase)", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ audioData: Buffer.from([1, 2, 3]).toString("base64") }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await synthesizeSpeech("Hello world");
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [url, options] = fetchSpy.mock.calls[0];
+    expect(url).toBe("https://api.speechify.ai/v1/audio/speech");
+    const body = JSON.parse(String(options?.body));
+    expect(body).toHaveProperty("voice_id");
+    expect(body.voice_id).toBe("henry");
+    expect(body).not.toHaveProperty("voiceId");
+  });
+
+  it("sends Authorization header with bearer token", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ audioData: Buffer.from([1, 2, 3]).toString("base64") }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await synthesizeSpeech("Hello");
+
+    const [, options] = fetchSpy.mock.calls[0];
+    expect((options?.headers as Record<string, string>)["Authorization"]).toBe(
+      "Bearer spc-test-key",
+    );
+  });
+
+  it("decodes base64 audioData and returns MP3 buffer", async () => {
+    const expected = Buffer.from([0x10, 0x20, 0x30, 0x40]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ audioData: expected.toString("base64") }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const result = await synthesizeSpeech("Hello");
+    expect(result.buffer).toEqual(expected);
+    expect(result.filename).toBe("assistant-reply.mp3");
+    expect(result.mimeType).toBe("audio/mpeg");
+  });
+
+  it("accepts the snake_case audio_data alias as well", async () => {
+    const expected = Buffer.from([0xab, 0xcd]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ audio_data: expected.toString("base64") }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const result = await synthesizeSpeech("Hello");
+    expect(result.buffer).toEqual(expected);
+  });
+
+  it("strips markdown before sending input", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ audioData: Buffer.from([1]).toString("base64") }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await synthesizeSpeech("Hello **bold** world");
+
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body));
+    expect(body.input).toBe("Hello bold world");
+  });
+
+  it("throws with the API error body on HTTP 4xx", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("validation failed:\nField voice_id is required", {
+        status: 400,
+        statusText: "Bad Request",
+      }),
+    );
+
+    await expect(synthesizeSpeech("Hello")).rejects.toThrow(
+      /Speechify API returned HTTP 400[\s\S]*Field voice_id is required/,
+    );
+  });
+
+  it("throws when the response has no audio data", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(synthesizeSpeech("Hello")).rejects.toThrow("empty audio response");
+  });
+
+  it("throws when the API key is missing", async () => {
+    mockTts.speechifyApiKey = "";
+
+    await expect(synthesizeSpeech("Hello")).rejects.toThrow("SPEECHIFY_API_KEY");
   });
 });
 

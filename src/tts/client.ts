@@ -172,10 +172,11 @@ async function synthesizeWithSpeechify(text: string): Promise<TtsResult> {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
+      // Speechify uses snake_case field names. Sending `voiceId` (camelCase)
+      // makes the API reject the request with "Field voice_id is required".
       body: JSON.stringify({
         input: text,
-        voiceId: voice,
-        options: { textNormalization: true },
+        voice_id: voice,
       }),
       signal: controller.signal,
     });
