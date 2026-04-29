@@ -32,6 +32,7 @@ const mockTts = vi.hoisted(() => ({
   provider: "openai" as string,
   model: "gpt-4o-mini-tts",
   voice: "alloy",
+  waitForIdle: true,
 }));
 
 vi.mock("../../src/config.js", () => ({
@@ -73,6 +74,8 @@ import {
   stripMarkdownForSpeech,
   extractLanguageCode,
   _resetGoogleClient,
+  accumulateTtsText,
+  flushTtsText,
 } from "../../src/tts/client.js";
 
 describe("isTtsConfigured", () => {
@@ -337,5 +340,57 @@ describe("synthesizeSpeech (Google)", () => {
 
     const callArgs = mockSynthesizeSpeech.mock.calls[0];
     expect(callArgs[0].input).toEqual({ text: "Hello bold and code" });
+  });
+});
+
+describe("accumulateTtsText / flushTtsText", () => {
+  beforeEach(() => {
+    mockTts.waitForIdle = true;
+    // Drain any leftover state from earlier tests so each case starts clean
+    flushTtsText("session-x");
+    flushTtsText("session-y");
+  });
+
+  it("stores text and returns it on flush", () => {
+    accumulateTtsText("session-x", "hello world");
+    expect(flushTtsText("session-x")).toBe("hello world");
+  });
+
+  it("flush is destructive — second flush returns null", () => {
+    accumulateTtsText("session-x", "first");
+    expect(flushTtsText("session-x")).toBe("first");
+    expect(flushTtsText("session-x")).toBeNull();
+  });
+
+  it("returns null when nothing was accumulated", () => {
+    expect(flushTtsText("session-x")).toBeNull();
+  });
+
+  it("does NOT accumulate when waitForIdle is false", () => {
+    mockTts.waitForIdle = false;
+    accumulateTtsText("session-x", "ignored text");
+    mockTts.waitForIdle = true;
+    expect(flushTtsText("session-x")).toBeNull();
+  });
+
+  // Regression guards for the silent-skip bug: an empty trailing message
+  // (commonly emitted by OpenCode after a tool-call sequence) used to
+  // overwrite a previously-good text, leading the idle handler to silently
+  // drop the audio for the whole turn.
+  it("does NOT overwrite an existing entry with an empty string", () => {
+    accumulateTtsText("session-x", "real text");
+    accumulateTtsText("session-x", "");
+    expect(flushTtsText("session-x")).toBe("real text");
+  });
+
+  it("does NOT overwrite an existing entry with whitespace-only text", () => {
+    accumulateTtsText("session-x", "real text");
+    accumulateTtsText("session-x", "   \n\t  ");
+    expect(flushTtsText("session-x")).toBe("real text");
+  });
+
+  it("does NOT seed an entry with empty input", () => {
+    accumulateTtsText("session-x", "");
+    expect(flushTtsText("session-x")).toBeNull();
   });
 });

@@ -215,9 +215,18 @@ const pendingTtsTexts = new Map<string, string>();
 /**
  * Stores the latest completed assistant message text for a session.
  * Called on every onComplete — only the last one matters.
+ *
+ * Defensive: skips empty/whitespace-only text. OpenCode sometimes emits a
+ * final completion event with an empty message after a tool-call sequence;
+ * without this guard, that empty string would pin the accumulator and
+ * `flushTtsText` would later return "", which the idle handler treats as
+ * "nothing to send" — silently dropping the audio for the whole turn.
  */
 export function accumulateTtsText(sessionId: string, text: string): void {
   if (!config.tts.waitForIdle) {
+    return;
+  }
+  if (!text || !text.trim()) {
     return;
   }
   pendingTtsTexts.set(sessionId, text);
