@@ -12,7 +12,8 @@ export const ru: I18nDictionary = {
   "cmd.description.tasklist": "Список задач по расписанию",
   "cmd.description.commands": "Пользовательские команды",
   "cmd.description.skills": "Каталог скиллов",
-  "cmd.description.mcps": "MCP серверы",
+  "cmd.description.mcp": "Установить новый MCP сервер",
+  "cmd.description.mcplist": "Список и переключение MCP серверов",
   "cmd.description.opencode_start": "Запустить OpenCode сервер",
   "cmd.description.opencode_stop": "Остановить OpenCode сервер",
   "cmd.description.soul": "Просмотр личности ассистента (soul.md)",
@@ -436,6 +437,72 @@ export const ru: I18nDictionary = {
   "tasklist.cancelled_callback": "Отменено",
   "tasklist.inactive_callback": "Это меню задач по расписанию уже неактивно",
   "tasklist.load_error": "🔴 Не удалось загрузить задачи по расписанию.",
+
+  "mcp.install.prompt.name":
+    "🔌 Отправь короткое имя для MCP сервера (буквы, цифры, _ и -). Пример: filesystem",
+  "mcp.install.prompt.type": "Выбери тип MCP сервера:",
+  "mcp.install.prompt.command":
+    "📝 Отправь полную команду для запуска MCP сервера.\n\nПример:\nnpx -y @modelcontextprotocol/server-filesystem /workspace",
+  "mcp.install.prompt.url":
+    "🌐 Отправь URL удалённого MCP сервера.\n\nПример:\nhttps://mcp.example.com/v1/sse",
+  "mcp.install.prompt.scope": "Выбери область установки:",
+  "mcp.install.prompt.env":
+    "🔐 Переменные окружения (опционально).\n\nОтправь строки KEY=значение (по одной на строку), загрузи файл (.env или credentials.json Google OAuth) или /skip для пропуска.",
+  "mcp.install.env_invalid":
+    "⚠️ Неверный формат. Каждая строка должна быть KEY=значение (KEY только A-Z, 0-9 и _).",
+  "mcp.install.env_skipped": "✅ Без переменных окружения.",
+  "mcp.install.json_parsed_oauth":
+    "✅ Распознаны Google OAuth учётные данные. Извлечены: {keys}",
+  "mcp.install.json_parsed_env":
+    "✅ Загружено {count} переменных окружения из файла.",
+  "mcp.install.json_unrecognized":
+    "⚠️ Файл не распознан как credentials.json OAuth или .env. Отправь KEY=значение вручную или /skip.",
+  "mcp.install.file_too_large": "⚠️ Файл слишком большой. Макс 64KB.",
+  "mcp.install.file_download_error": "🔴 Не удалось загрузить файл.",
+  "mcp.install.preview":
+    "Проверь MCP сервер перед установкой:\n\nИмя: {name}\nТип: {type}\nОбласть: {scope}\n{spec}{envBlock}",
+  "mcp.install.preview.command": "Команда: {command}",
+  "mcp.install.preview.url": "URL: {url}",
+  "mcp.install.preview.env_keys": "\nПеременные окружения ({count}): {keys}",
+  "mcp.install.tunnel_disclaimer":
+    "ℹ️ Этот MCP, похоже, использует OAuth. OAuth-поток открывает callback URL при первом использовании.\n\n• Локальный ПК: работает сразу.\n• Docker / VPS / Droplet: localhost callback недоступен. Нужен публичный HTTPS туннель к контейнеру OpenCode, затем установи GOOGLE_OAUTH_REDIRECT_URI / WORKSPACE_EXTERNAL_URL.\n\nБесплатные варианты без верификации:\n• ngrok — `ngrok http 8000`\n• Cloudflared (TryCloudflare) — `cloudflared tunnel --url http://localhost:8000`\n\nАвторизуй полученный публичный URL в Google Cloud Console как redirect URI твоего OAuth клиента.",
+  "mcp.install.scope.global": "🌐 Глобально (все сессии)",
+  "mcp.install.scope.project": "📁 Только этот проект",
+  "mcp.install.scope.global_label": "глобально",
+  "mcp.install.scope.project_label": "проект",
+  "mcp.install.button.local": "🖥️ Локальный",
+  "mcp.install.button.remote": "🌐 Удалённый",
+  "mcp.install.button.global": "🌐 Глобально",
+  "mcp.install.button.project": "📁 Только этот проект",
+  "mcp.install.button.confirm": "✅ Установить",
+  "mcp.install.button.cancel": "❌ Отмена",
+  "mcp.install.name_invalid":
+    "⚠️ Неверное имя. Только буквы, цифры, _ и -, до 64 символов.",
+  "mcp.install.name_taken": "⚠️ MCP сервер с таким именем уже существует.",
+  "mcp.install.command_empty": "⚠️ Команда не может быть пустой.",
+  "mcp.install.url_invalid": "⚠️ Неверная URL. Отправь валидную http(s):// URL.",
+  "mcp.install.cancelled": "❌ Установка MCP отменена.",
+  "mcp.install.cancel_callback": "Отмена...",
+  "mcp.install.installing": "⏳ Установка MCP сервера...",
+  "mcp.install.success": "✅ MCP установлен: {name} ({type}, {scope}). Статус: {status}",
+  "mcp.install.connect_failed":
+    "⚠️ MCP установлен, но не удалось подключиться: {error}",
+  "mcp.install.error": "🔴 Не удалось установить MCP сервер: {error}",
+  "mcp.install.inactive_callback": "Этот процесс установки MCP уже неактивен",
+  "mcp.install.inactive": "⚠️ Установка MCP не активна. Запусти /mcp снова.",
+  "mcp.install.project_not_selected":
+    "🏗 Нет выбранного проекта. Используй /projects или выбери глобальную область.",
+
+  "cron.delivery.continue_button": "▶️ Продолжить в активной сессии",
+  "cron.delivery.cancel_button": "❌ Отбросить",
+  "cron.delivery.continuing_callback": "Внедряем в активную сессию...",
+  "cron.delivery.discarded_callback": "Отброшено",
+  "cron.delivery.discarded": "❌ Результат cron отброшен.",
+  "cron.delivery.no_active_session":
+    "Нет активной сессии. Откройте её через /new и снова нажмите Продолжить.",
+  "cron.delivery.expired": "Этот результат cron больше не доступен.",
+  "cron.delivery.inject_failed":
+    "🔴 Не удалось внедрить результат cron в активную сессию.",
 
   "commands.select": "Выберите команду OpenCode:",
   "commands.empty": "📭 Для этого проекта нет доступных команд OpenCode.",

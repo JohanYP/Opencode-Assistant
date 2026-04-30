@@ -8,20 +8,21 @@ import {
   addScheduledTask,
   listScheduledTasks,
   removeScheduledTask,
-  replaceScheduledTasks,
 } from "../scheduled-task/store.js";
-import type { ScheduledCronTask, ScheduledOnceTask, ScheduledTask } from "../scheduled-task/types.js";
+import type { ScheduledCronTask, ScheduledTask } from "../scheduled-task/types.js";
 import { computeNextRunAt } from "../scheduled-task/next-run.js";
 import { config } from "../config.js";
 import { scheduledTaskRuntime } from "../scheduled-task/runtime.js";
 
 // Types for cron.yml entries
+type CronYmlEntryType = "task" | "reminder" | "backup";
+
 interface CronYmlEntry {
   id: string;
   schedule: string;
   prompt?: string;
   message?: string;
-  type?: "task" | "reminder" | "backup";
+  type?: CronYmlEntryType;
   timezone?: string;
 }
 
@@ -77,13 +78,21 @@ export async function writeCronYml(tasks: ScheduledTask[]): Promise<void> {
     const cronEntries: CronYmlEntry[] = tasks
       .filter((t) => t.kind === "cron")
       .map((t) => {
+        const taskType = (t.type ?? "task") as CronYmlEntryType;
         const entry: CronYmlEntry = {
           id: t.id.startsWith(YML_ID_PREFIX) ? t.id.slice(YML_ID_PREFIX.length) : t.id,
           schedule: (t as ScheduledCronTask).cron,
+          type: taskType,
           timezone: t.timezone,
         };
-        if (t.prompt) {
-          entry.prompt = t.prompt;
+        if (taskType === "reminder") {
+          if (t.prompt) {
+            entry.message = t.prompt;
+          }
+        } else if (taskType === "task") {
+          if (t.prompt) {
+            entry.prompt = t.prompt;
+          }
         }
         return entry;
       });
@@ -132,17 +141,19 @@ export async function syncFromYml(): Promise<void> {
       continue;
     }
 
-    if (entry.type === "backup") {
-      // Backup tasks are handled by the reminder module
-      continue;
-    }
-
     const timezone = entry.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const prompt = entry.prompt ?? entry.message ?? "";
+    const taskType: "task" | "reminder" | "backup" = entry.type ?? "task";
+    const prompt =
+      taskType === "reminder"
+        ? entry.message ?? entry.prompt ?? ""
+        : taskType === "backup"
+          ? ""
+          : entry.prompt ?? entry.message ?? "";
 
     try {
       const task: ScheduledCronTask = {
         id: taskId,
+        type: taskType,
         kind: "cron",
         cron: entry.schedule,
         projectId: "default",
@@ -165,7 +176,9 @@ export async function syncFromYml(): Promise<void> {
 
       await addScheduledTask(task);
       scheduledTaskRuntime.registerTask(task);
-      logger.info(`[CronYmlSync] Added yml task: ${taskId} (${entry.schedule})`);
+      logger.info(
+        `[CronYmlSync] Added yml task: ${taskId} type=${taskType} (${entry.schedule})`,
+      );
     } catch (error) {
       logger.warn(`[CronYmlSync] Failed to add yml task ${taskId}:`, error);
     }

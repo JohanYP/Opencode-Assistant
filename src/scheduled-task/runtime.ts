@@ -1,4 +1,4 @@
-import type { Bot, Context } from "grammy";
+import { InlineKeyboard, type Bot, type Context } from "grammy";
 import { config } from "../config.js";
 import {
   escapePlainTextForTelegramMarkdownV2,
@@ -8,6 +8,9 @@ import { t } from "../i18n/index.js";
 import { logger } from "../utils/logger.js";
 import { safeBackgroundTask } from "../utils/safe-background-task.js";
 import { sendBotText } from "../bot/utils/telegram-text.js";
+import { createDelivery } from "../cron/delivery-store.js";
+import { sendCronVoiceNote } from "../cron/voice-sender.js";
+import { runMemoryBackup, sendReminder } from "../cron/reminder.js";
 import { executeScheduledTask } from "./executor.js";
 import { foregroundSessionState } from "./foreground-state.js";
 import { computeNextRunAt, isTaskDue } from "./next-run.js";
@@ -355,6 +358,18 @@ export class ScheduledTaskRuntime {
     }
 
     try {
+      const taskType = runningTask.type ?? "task";
+
+      if (taskType === "reminder") {
+        await this.executeReminderTask(runningTask, startedAt);
+        return;
+      }
+
+      if (taskType === "backup") {
+        await this.executeBackupTask(runningTask, startedAt);
+        return;
+      }
+
       const result = await executeScheduledTask(runningTask);
 
       if (result.status === "success") {
@@ -375,12 +390,79 @@ export class ScheduledTaskRuntime {
     }
   }
 
+  private async executeReminderTask(task: ScheduledTask, startedAt: string): Promise<void> {
+    try {
+      await sendReminder(task.prompt || task.scheduleSummary);
+      await this.finalizeNonTaskExecution(task, startedAt, "success", null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`[ScheduledTaskRuntime] Reminder execution failed: id=${task.id}`, error);
+      await this.finalizeNonTaskExecution(task, startedAt, "error", message);
+    }
+  }
+
+  private async executeBackupTask(task: ScheduledTask, startedAt: string): Promise<void> {
+    try {
+      await runMemoryBackup();
+      await this.finalizeNonTaskExecution(task, startedAt, "success", null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`[ScheduledTaskRuntime] Backup execution failed: id=${task.id}`, error);
+      await this.finalizeNonTaskExecution(task, startedAt, "error", message);
+    }
+  }
+
+  private async finalizeNonTaskExecution(
+    task: ScheduledTask,
+    startedAt: string,
+    status: "success" | "error",
+    errorMessage: string | null,
+  ): Promise<void> {
+    if (task.kind === "once") {
+      await removeScheduledTask(task.id);
+      this.removeTask(task.id);
+      return;
+    }
+
+    let nextRunAt: string | null;
+    try {
+      nextRunAt = computeNextRunAt(task, new Date(startedAt));
+    } catch (error) {
+      logger.error(
+        `[ScheduledTaskRuntime] Failed to compute next run after ${status}: id=${task.id}`,
+        error,
+      );
+      nextRunAt = null;
+    }
+
+    const updatedTask = await updateScheduledTask(task.id, (currentTask) => ({
+      ...currentTask,
+      lastStatus: status,
+      lastError: errorMessage,
+      nextRunAt,
+    }));
+
+    if (updatedTask) {
+      this.scheduleTask(updatedTask);
+    }
+  }
+
   private async handleSuccessfulExecution(
     task: ScheduledTask,
     finishedAt: string,
     resultText: string,
   ): Promise<void> {
     const delivery = buildSuccessDelivery(task, finishedAt, resultText);
+
+    if (resultText.trim() && (task.type ?? "task") === "task") {
+      const pending = createDelivery({
+        taskId: task.id,
+        prompt: task.prompt,
+        resultText,
+        runAt: finishedAt,
+      });
+      delivery.deliveryId = pending.deliveryId;
+    }
 
     if (task.kind === "once") {
       await removeScheduledTask(task.id);
@@ -465,6 +547,9 @@ export class ScheduledTaskRuntime {
       return false;
     }
 
+    const api = this.botApi;
+    const chatId = this.chatId;
+
     try {
       const messageParts =
         delivery.status === "success"
@@ -472,13 +557,24 @@ export class ScheduledTaskRuntime {
           : [delivery.notificationText];
       const format = delivery.status === "success" ? getScheduledTaskDeliveryFormat() : "raw";
 
-      for (const part of messageParts) {
+      const lastIndex = messageParts.length - 1;
+      const replyMarkup = delivery.deliveryId
+        ? buildCronDeliveryKeyboard(delivery.deliveryId)
+        : undefined;
+
+      for (let i = 0; i < messageParts.length; i++) {
         await sendBotText({
-          api: this.botApi,
-          chatId: this.chatId,
-          text: part,
+          api,
+          chatId,
+          text: messageParts[i],
           format,
+          options:
+            i === lastIndex && replyMarkup ? { reply_markup: replyMarkup } : undefined,
         });
+      }
+
+      if (delivery.status === "success" && delivery.resultText) {
+        await sendCronVoiceNote(api, chatId, delivery.resultText);
       }
 
       return true;
@@ -490,6 +586,12 @@ export class ScheduledTaskRuntime {
       return false;
     }
   }
+}
+
+function buildCronDeliveryKeyboard(deliveryId: string): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(t("cron.delivery.continue_button"), `cron:continue:${deliveryId}`)
+    .text(t("cron.delivery.cancel_button"), `cron:cancel:${deliveryId}`);
 }
 
 export const scheduledTaskRuntime = new ScheduledTaskRuntime();

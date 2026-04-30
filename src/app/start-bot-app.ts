@@ -6,6 +6,8 @@ import { config } from "../config.js";
 import { opencodeAutoRestartService } from "../opencode/auto-restart.js";
 import { loadSettings } from "../settings/manager.js";
 import { scheduledTaskRuntime } from "../scheduled-task/runtime.js";
+import { setReminderBot } from "../cron/reminder.js";
+import { startCronYmlSync, stopCronYmlSync } from "../cron/yml-sync.js";
 import { warmupSessionDirectoryCache } from "../session/cache-manager.js";
 import { reconcileStoredModelSelection } from "../model/manager.js";
 import { startMemorySummaryWatcher, stopMemorySummaryWatcher } from "../memory/watcher.js";
@@ -56,7 +58,9 @@ export async function startBotApp(): Promise<void> {
   startMemorySummaryWatcher();
 
   const bot = createBot();
+  setReminderBot(bot);
   await scheduledTaskRuntime.initialize(bot);
+  await startCronYmlSync();
 
   let shutdownStarted = false;
   let serviceStateCleared = false;
@@ -97,6 +101,7 @@ export async function startBotApp(): Promise<void> {
     cleanupBotRuntime(`app_shutdown_${signal.toLowerCase()}`);
     opencodeAutoRestartService.stop();
     scheduledTaskRuntime.shutdown();
+    stopCronYmlSync();
     stopMemorySummaryWatcher();
 
     shutdownTimeout = setTimeout(() => {
@@ -144,6 +149,7 @@ export async function startBotApp(): Promise<void> {
     cleanupBotRuntime("app_shutdown_complete");
     opencodeAutoRestartService.stop();
     scheduledTaskRuntime.shutdown();
+    stopCronYmlSync();
     await clearManagedServiceState().catch((error) => {
       logger.warn("[App] Failed to clear managed service state", error);
     });

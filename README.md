@@ -8,19 +8,11 @@
 
 A fully-featured **personal AI assistant** running in Telegram, powered by [OpenCode](https://opencode.ai) and the free `big-pickle` model (Claude Sonnet). No subscriptions, no API costs — completely free to run.
 
-Deploy in minutes with a single guided setup script. Everything runs locally on your machine or server.
+Persistent memory across sessions, scheduled tasks with continue/cancel buttons that inject results into your active chat, voice replies, and one-command MCP server installation. Deploy in minutes with a single guided setup script. Everything runs locally on your machine or server.
 
 ---
 
-## Credits
-
-This project is a fork of **[grinev/opencode-telegram-bot](https://github.com/grinev/opencode-telegram-bot)** by [Ruslan Grinev](https://github.com/grinev) — an excellent Telegram client for OpenCode. All original features are preserved and the core architecture is entirely his work.
-
-This fork extends the original bot to turn it into a **personal assistant** with persistent memory, skills, cron jobs, and more. If you only need a coding bot without the personal assistant features, use the original repo.
-
----
-
-## What's New in This Fork
+## Highlights
 
 ### Persistent Memory System
 The assistant remembers who it is and what you've discussed across sessions. At the start of every new session it automatically receives its identity (`soul.md`), available skills, and a summary of the previous session — so it continues right where you left off, without you repeating context.
@@ -112,9 +104,7 @@ No Node.js needed on your machine — everything runs inside Docker.
 
 ## Features
 
-All original features from [grinev/opencode-telegram-bot](https://github.com/grinev/opencode-telegram-bot) plus:
-
-### Original Features
+### Core
 - **Remote coding** — send prompts to OpenCode from anywhere
 - **Session management** — create, switch, and track sessions
 - **Live status** — pinned message with project, model, context usage
@@ -130,7 +120,7 @@ All original features from [grinev/opencode-telegram-bot](https://github.com/gri
 - **Security** — strict user ID whitelist
 - **Localization** — en, es, de, fr, ru, zh
 
-### Added in This Fork
+### Personal Assistant Layer
 - **Persistent memory** across sessions (soul, memory, context, session summary)
 - **OpenClaw SKILL.md compatibility** — install any skill from GitHub
 - **`/skill_install <url>`** — install skills directly from Telegram

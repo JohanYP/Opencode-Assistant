@@ -1,11 +1,11 @@
 {
-  "name": "@grinev/opencode-telegram-bot",
+  "name": "opencode-assistant",
   "version": "0.19.0",
-  "description": "Telegram bot client for OpenCode to run and monitor coding tasks from chat.",
+  "description": "Personal AI assistant on Telegram powered by OpenCode: persistent memory, skills, cron jobs with continue/cancel buttons, voice TTS/STT, and one-command MCP installation.",
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
-    "opencode-telegram": "dist/cli.js"
+    "opencode-assistant": "dist/cli.js"
   },
   "exports": {
     ".": "./dist/index.js",
@@ -34,22 +34,24 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/grinev/opencode-telegram-bot.git"
+    "url": "git+https://github.com/JohanYP/Opencode-Assistant.git"
   },
   "keywords": [
     "opencode",
     "telegram",
     "telegram-bot",
+    "ai-assistant",
+    "personal-assistant",
+    "mcp",
     "grammy",
-    "developer-tools",
-    "cli"
+    "cron"
   ],
-  "author": "grinev",
+  "author": "JohanYP",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/grinev/opencode-telegram-bot/issues"
+    "url": "https://github.com/JohanYP/Opencode-Assistant/issues"
   },
-  "homepage": "https://github.com/grinev/opencode-telegram-bot#readme",
+  "homepage": "https://github.com/JohanYP/Opencode-Assistant#readme",
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.4.0",
     "@grammyjs/menu": "^1.3.1",

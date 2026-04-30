@@ -267,6 +267,7 @@ function buildScheduledTask(
 ): ScheduledTask {
   const baseTask = {
     id: randomUUID(),
+    type: "task" as const,
     projectId,
     projectWorktree,
     model,

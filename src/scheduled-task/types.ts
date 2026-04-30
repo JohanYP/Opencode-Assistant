@@ -4,6 +4,8 @@ export type ScheduledTaskKind = "cron" | "once";
 
 export type ScheduledTaskStatus = "idle" | "running" | "success" | "error";
 
+export type ScheduledTaskType = "task" | "reminder" | "backup";
+
 export interface ScheduledTaskModel {
   providerID: string;
   modelID: string;
@@ -12,6 +14,7 @@ export interface ScheduledTaskModel {
 
 export interface ScheduledTaskBase {
   id: string;
+  type: ScheduledTaskType;
   projectId: string;
   projectWorktree: string;
   model: ScheduledTaskModel;
@@ -90,6 +93,7 @@ export function cloneScheduledTaskModel(model: ScheduledTaskModel): ScheduledTas
 export function cloneScheduledTask(task: ScheduledTask): ScheduledTask {
   return {
     ...task,
+    type: task.type ?? "task",
     model: cloneScheduledTaskModel(task.model),
   };
 }
@@ -111,4 +115,14 @@ export interface QueuedScheduledTaskDelivery {
   status: "success" | "error";
   notificationText: string;
   resultText?: string;
+  deliveryId?: string;
+}
+
+export interface PendingCronDelivery {
+  deliveryId: string;
+  taskId: string;
+  prompt: string;
+  resultText: string;
+  runAt: string;
+  createdAt: number;
 }

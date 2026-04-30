@@ -28,6 +28,7 @@ import { opencodeStopCommand } from "./commands/opencode-stop.js";
 import { renameCommand, handleRenameCancel, handleRenameTextAnswer } from "./commands/rename.js";
 import { handleTaskCallback, handleTaskTextInput, taskCommand } from "./commands/task.js";
 import { handleTaskListCallback, taskListCommand } from "./commands/tasklist.js";
+import { handleCronDeliveryCallback } from "../cron/delivery-handler.js";
 import {
   commandsCommand,
   handleCommandsCallback,
@@ -39,6 +40,12 @@ import {
   handleSkillTextArguments,
 } from "./commands/skills.js";
 import { mcpsCommand, handleMcpsCallback } from "./commands/mcps.js";
+import {
+  mcpCommand,
+  handleMcpInstallCallback,
+  handleMcpInstallTextInput,
+  handleMcpInstallDocument,
+} from "./commands/mcp-install.js";
 import { ttsCommand } from "./commands/tts.js";
 import { registerMemoryCommands } from "./commands/memory-commands.js";
 import { accumulateTtsText, flushTtsText } from "../tts/client.js";
@@ -1107,7 +1114,8 @@ export function createBot(): Bot<Context> {
   bot.command("rename", renameCommand);
   bot.command("commands", commandsCommand);
   bot.command("skills", skillsCommand);
-  bot.command("mcps", mcpsCommand);
+  bot.command("mcp", mcpCommand);
+  bot.command("mcplist", mcpsCommand);
 
   // Memory commands: /soul, /memory, /context, /memfiles, /skills_list, /skill
   registerMemoryCommands(bot);
@@ -1145,9 +1153,14 @@ export function createBot(): Bot<Context> {
       const handledCommands = await handleCommandsCallback(ctx, { bot, ensureEventSubscription });
       const handledSkills = await handleSkillsCallback(ctx, { bot, ensureEventSubscription });
       const handledMcps = await handleMcpsCallback(ctx);
+      const handledMcpInstall = await handleMcpInstallCallback(ctx);
+      const handledCronDelivery = await handleCronDeliveryCallback(ctx, {
+        bot,
+        ensureEventSubscription,
+      });
 
       logger.debug(
-        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, session=${handledSession}, project=${handledProject}, worktree=${handledWorktree}, open=${handledOpen}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, compactConfirm=${handledCompactConfirm}, task=${handledTask}, taskList=${handledTaskList}, rename=${handledRenameCancel}, commands=${handledCommands}, skills=${handledSkills}, mcps=${handledMcps}`,
+        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, session=${handledSession}, project=${handledProject}, worktree=${handledWorktree}, open=${handledOpen}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, compactConfirm=${handledCompactConfirm}, task=${handledTask}, taskList=${handledTaskList}, rename=${handledRenameCancel}, commands=${handledCommands}, skills=${handledSkills}, mcps=${handledMcps}, mcpInstall=${handledMcpInstall}, cronDelivery=${handledCronDelivery}`,
       );
 
       if (
@@ -1167,7 +1180,9 @@ export function createBot(): Bot<Context> {
         !handledRenameCancel &&
         !handledCommands &&
         !handledSkills &&
-        !handledMcps
+        !handledMcps &&
+        !handledMcpInstall &&
+        !handledCronDelivery
       ) {
         logger.debug("Unknown callback query:", ctx.callbackQuery?.data);
         await ctx.answerCallbackQuery({ text: t("callback.unknown_command") });
@@ -1376,6 +1391,12 @@ export function createBot(): Bot<Context> {
     logger.debug(`[Bot] Received document message, chatId=${ctx.chat.id}`);
     botInstance = bot;
     chatIdInstance = ctx.chat.id;
+
+    const handledMcpInstall = await handleMcpInstallDocument(ctx);
+    if (handledMcpInstall) {
+      return;
+    }
+
     const deps = { bot, ensureEventSubscription };
     await handleDocumentMessage(ctx, deps);
   });
@@ -1400,6 +1421,11 @@ export function createBot(): Bot<Context> {
 
     const handledTask = await handleTaskTextInput(ctx);
     if (handledTask) {
+      return;
+    }
+
+    const handledMcpInstall = await handleMcpInstallTextInput(ctx);
+    if (handledMcpInstall) {
       return;
     }
 

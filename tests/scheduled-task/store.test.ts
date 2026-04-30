@@ -14,6 +14,7 @@ import type { ScheduledTask } from "../../src/scheduled-task/types.js";
 function createScheduledTask(overrides: Partial<ScheduledTask> = {}): ScheduledTask {
   return {
     id: "task-1",
+    type: "task",
     kind: "cron",
     projectId: "project-1",
     projectWorktree: "D:/Projects/Repo",
