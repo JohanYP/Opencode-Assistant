@@ -392,7 +392,7 @@ export const fr: I18nDictionary = {
   "runtime.wizard.not_configured_starting":
     "L'application n'est pas encore configurée. Lancement de l'assistant...\n",
   "runtime.wizard.tty_required":
-    "L'assistant interactif nécessite un terminal TTY. Exécutez `opencode-telegram config` dans un shell interactif.",
+    "L'assistant interactif nécessite un terminal TTY. Exécutez `opencode-assistant config` dans un shell interactif.",
 
   "rename.no_session": "⚠️ Aucune session active. Créez ou sélectionnez d'abord une session.",
   "rename.prompt": "📝 Entrez le nouveau titre de la session :\n\nActuel : {title}",

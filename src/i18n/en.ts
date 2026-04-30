@@ -373,7 +373,7 @@ export const en = {
   "runtime.wizard.not_configured_starting":
     "Application is not configured yet. Starting wizard...\n",
   "runtime.wizard.tty_required":
-    "Interactive wizard requires a TTY terminal. Run `opencode-telegram config` in an interactive shell.",
+    "Interactive wizard requires a TTY terminal. Run `opencode-assistant config` in an interactive shell.",
 
   "rename.no_session": "⚠️ No active session. Create or select a session first.",
   "rename.prompt": "📝 Enter new title for session:\n\nCurrent: {title}",

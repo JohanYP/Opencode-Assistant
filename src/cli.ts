@@ -10,10 +10,10 @@ const EXIT_RUNTIME_ERROR = 1;
 const EXIT_INVALID_ARGS = 2;
 
 const CLI_USAGE = `Usage:
-  opencode-telegram [start] [--daemon] [--mode installed]
-  opencode-telegram status
-  opencode-telegram stop
-  opencode-telegram config
+  opencode-assistant [start] [--daemon] [--mode installed]
+  opencode-assistant status
+  opencode-assistant stop
+  opencode-assistant config
 
 Notes:
   - No command defaults to start
@@ -22,16 +22,16 @@ Notes:
 
 const CLI_MESSAGES = {
   daemonRequiresInstalled:
-    "Daemon mode is supported only for the installed runtime. Use `opencode-telegram start` for foreground source runs.",
+    "Daemon mode is supported only for the installed runtime. Use `opencode-assistant start` for foreground source runs.",
   unknownServiceError: "Unknown service error.",
   cleanupStale: "Removed stale daemon state file.",
   cleanupInvalid: "Removed invalid daemon state file.",
-  startSuccess: "OpenCode Telegram Bot daemon started.",
-  startAlreadyRunning: "OpenCode Telegram Bot daemon is already running.",
+  startSuccess: "Opencode-Assistant daemon started.",
+  startAlreadyRunning: "Opencode-Assistant daemon is already running.",
   statusRunning: "Service status: running",
   statusStopped: "Service status: stopped",
-  stopSuccess: "OpenCode Telegram Bot daemon stopped.",
-  stopAlreadyStopped: "OpenCode Telegram Bot daemon is not running.",
+  stopSuccess: "Opencode-Assistant daemon stopped.",
+  stopAlreadyStopped: "Opencode-Assistant daemon is not running.",
   linePid: (pid: number) => `PID: ${pid}`,
   lineStartedAt: (startedAt: string) => `Started at: ${startedAt}`,
   lineUptimeSec: (seconds: number) => `Uptime: ${seconds} sec`,

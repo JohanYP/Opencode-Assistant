@@ -376,7 +376,7 @@ export const ru: I18nDictionary = {
   "runtime.wizard.not_configured_starting":
     "Приложение еще не сконфигурировано. Запускаю wizard...\n",
   "runtime.wizard.tty_required":
-    "Интерактивный wizard требует TTY-терминал. Запустите `opencode-telegram config` в интерактивной оболочке.",
+    "Интерактивный wizard требует TTY-терминал. Запустите `opencode-assistant config` в интерактивной оболочке.",
 
   "rename.no_session": "⚠️ Нет активной сессии. Сначала создайте или выберите сессию.",
   "rename.prompt": "📝 Введите новое название сессии:\n\nТекущее: {title}",

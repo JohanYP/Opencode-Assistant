@@ -33,7 +33,7 @@ Install skills directly from Telegram with one command:
 ```
 
 ### Cron Jobs — Three Types
-Beyond the original scheduled tasks, this fork adds two new cron types via `memory/cron.yml`:
+Beyond the basic scheduled tasks, three cron types are supported via `memory/cron.yml`:
 
 | Type | Description |
 |---|---|
@@ -158,7 +158,7 @@ No Node.js needed on your machine — everything runs inside Docker.
 | `/opencode_stop` | Stop the local OpenCode server |
 | `/help` | Show available commands |
 
-### New Commands (This Fork)
+### Personal Assistant Commands
 | Command | Description |
 |---|---|
 | `/soul` | View assistant personality (soul.md) |

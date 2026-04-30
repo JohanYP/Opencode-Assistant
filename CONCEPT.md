@@ -23,8 +23,6 @@ The following are intentionally out of scope at this stage:
 - Multi-user access model
 - Full forum-thread orchestration as a primary interaction design
 
-You can try fork of this project which supports topics and parallel execution: https://github.com/shanekunz/opencode-telegram-group-topics-bot
-
 ## Why This Direction
 
 This direction is intentional and practical:
