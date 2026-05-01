@@ -434,71 +434,7 @@ export const en = {
   "tasklist.inactive_callback": "This scheduled task menu is inactive",
   "tasklist.load_error": "🔴 Failed to load scheduled tasks.",
 
-  "cmd.description.mcp": "Install a new MCP server",
   "cmd.description.mcplist": "List and toggle MCP servers",
-
-  "mcp.install.prompt.name":
-    "🔌 Send a short name for the MCP server (letters, numbers, _ and -). Example: filesystem",
-  "mcp.install.prompt.type":
-    "Select the MCP server type:",
-  "mcp.install.prompt.command":
-    "📝 Send the full command to run the MCP server.\n\nExample:\nnpx -y @modelcontextprotocol/server-filesystem /workspace",
-  "mcp.install.prompt.url":
-    "🌐 Send the URL of the remote MCP server.\n\nExample:\nhttps://mcp.example.com/v1/sse",
-  "mcp.install.prompt.scope":
-    "Choose the install scope:",
-  "mcp.install.prompt.env":
-    "🔐 Environment variables (optional).\n\nSend KEY=value lines (one per line), upload a file (.env or Google OAuth credentials.json), or send /skip to omit.\n\nExample:\nGOOGLE_OAUTH_CLIENT_ID=your-id\nGOOGLE_OAUTH_CLIENT_SECRET=your-secret",
-  "mcp.install.env_invalid":
-    "⚠️ Invalid env format. Each line must be KEY=value with KEY using only A-Z, 0-9 and _.",
-  "mcp.install.env_skipped": "✅ No environment variables.",
-  "mcp.install.json_parsed_oauth":
-    "✅ Detected Google OAuth credentials. Extracted: {keys}",
-  "mcp.install.json_parsed_env":
-    "✅ Loaded {count} environment variable(s) from file.",
-  "mcp.install.json_unrecognized":
-    "⚠️ The file is not a recognized OAuth credentials.json or .env file. Send KEY=value lines manually or /skip.",
-  "mcp.install.file_too_large":
-    "⚠️ File too large. Max size is 64KB.",
-  "mcp.install.file_download_error":
-    "🔴 Could not download the uploaded file.",
-  "mcp.install.preview":
-    "Review the MCP server before installing:\n\nName: {name}\nType: {type}\nScope: {scope}\n{spec}{envBlock}",
-  "mcp.install.preview.command": "Command: {command}",
-  "mcp.install.preview.url": "URL: {url}",
-  "mcp.install.preview.env_keys": "\nEnvironment variables ({count}): {keys}",
-  "mcp.install.tunnel_disclaimer":
-    "ℹ️ This MCP looks OAuth-based. The OAuth flow opens a callback URL when you first use the MCP.\n\n• Local PC: works out of the box.\n• Docker / VPS / Droplet: the callback localhost will not be reachable. You need a public HTTPS tunnel pointing to the OpenCode container, then set GOOGLE_OAUTH_REDIRECT_URI / WORKSPACE_EXTERNAL_URL accordingly.\n\nFree options that work without verification:\n• ngrok — `ngrok http 8000`\n• Cloudflared (TryCloudflare) — `cloudflared tunnel --url http://localhost:8000`\n\nAuthorize the resulting public URL in Google Cloud Console under your OAuth client's redirect URIs.",
-  "mcp.install.scope.global": "🌐 Global (all sessions)",
-  "mcp.install.scope.project": "📁 Only this project",
-  "mcp.install.scope.global_label": "global",
-  "mcp.install.scope.project_label": "project",
-  "mcp.install.button.local": "🖥️ Local",
-  "mcp.install.button.remote": "🌐 Remote",
-  "mcp.install.button.global": "🌐 Global",
-  "mcp.install.button.project": "📁 This project only",
-  "mcp.install.button.confirm": "✅ Install",
-  "mcp.install.button.cancel": "❌ Cancel",
-  "mcp.install.name_invalid":
-    "⚠️ Invalid name. Use only letters, numbers, _ and -, max 64 chars.",
-  "mcp.install.name_taken":
-    "⚠️ An MCP server with that name already exists. Pick another or remove it first.",
-  "mcp.install.command_empty":
-    "⚠️ Command cannot be empty. Send the full command.",
-  "mcp.install.url_invalid":
-    "⚠️ Invalid URL. Send a valid http(s):// URL.",
-  "mcp.install.cancelled": "❌ MCP install cancelled.",
-  "mcp.install.cancel_callback": "Cancelling...",
-  "mcp.install.installing": "⏳ Installing MCP server...",
-  "mcp.install.success":
-    "✅ MCP installed: {name} ({type}, {scope}). Status: {status}",
-  "mcp.install.connect_failed":
-    "⚠️ MCP installed but failed to connect: {error}",
-  "mcp.install.error": "🔴 Failed to install MCP server: {error}",
-  "mcp.install.inactive_callback": "This MCP install flow is no longer active",
-  "mcp.install.inactive": "⚠️ MCP install is not active. Run /mcp again.",
-  "mcp.install.project_not_selected":
-    "🏗 No project is selected. Use /projects first or pick global scope.",
 
   "cron.delivery.continue_button": "▶️ Continue in active session",
   "cron.delivery.cancel_button": "❌ Discard",

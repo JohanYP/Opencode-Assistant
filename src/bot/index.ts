@@ -40,12 +40,6 @@ import {
   handleSkillTextArguments,
 } from "./commands/skills.js";
 import { mcpsCommand, handleMcpsCallback } from "./commands/mcps.js";
-import {
-  mcpCommand,
-  handleMcpInstallCallback,
-  handleMcpInstallTextInput,
-  handleMcpInstallDocument,
-} from "./commands/mcp-install.js";
 import { ttsCommand } from "./commands/tts.js";
 import { registerMemoryCommands } from "./commands/memory-commands.js";
 import { accumulateTtsText, flushTtsText } from "../tts/client.js";
@@ -1114,7 +1108,6 @@ export function createBot(): Bot<Context> {
   bot.command("rename", renameCommand);
   bot.command("commands", commandsCommand);
   bot.command("skills", skillsCommand);
-  bot.command("mcp", mcpCommand);
   bot.command("mcplist", mcpsCommand);
 
   // Memory commands: /soul, /memory, /context, /memfiles, /skills_list, /skill
@@ -1153,14 +1146,13 @@ export function createBot(): Bot<Context> {
       const handledCommands = await handleCommandsCallback(ctx, { bot, ensureEventSubscription });
       const handledSkills = await handleSkillsCallback(ctx, { bot, ensureEventSubscription });
       const handledMcps = await handleMcpsCallback(ctx);
-      const handledMcpInstall = await handleMcpInstallCallback(ctx);
       const handledCronDelivery = await handleCronDeliveryCallback(ctx, {
         bot,
         ensureEventSubscription,
       });
 
       logger.debug(
-        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, session=${handledSession}, project=${handledProject}, worktree=${handledWorktree}, open=${handledOpen}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, compactConfirm=${handledCompactConfirm}, task=${handledTask}, taskList=${handledTaskList}, rename=${handledRenameCancel}, commands=${handledCommands}, skills=${handledSkills}, mcps=${handledMcps}, mcpInstall=${handledMcpInstall}, cronDelivery=${handledCronDelivery}`,
+        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, session=${handledSession}, project=${handledProject}, worktree=${handledWorktree}, open=${handledOpen}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, compactConfirm=${handledCompactConfirm}, task=${handledTask}, taskList=${handledTaskList}, rename=${handledRenameCancel}, commands=${handledCommands}, skills=${handledSkills}, mcps=${handledMcps}, cronDelivery=${handledCronDelivery}`,
       );
 
       if (
@@ -1181,7 +1173,6 @@ export function createBot(): Bot<Context> {
         !handledCommands &&
         !handledSkills &&
         !handledMcps &&
-        !handledMcpInstall &&
         !handledCronDelivery
       ) {
         logger.debug("Unknown callback query:", ctx.callbackQuery?.data);
@@ -1391,12 +1382,6 @@ export function createBot(): Bot<Context> {
     logger.debug(`[Bot] Received document message, chatId=${ctx.chat.id}`);
     botInstance = bot;
     chatIdInstance = ctx.chat.id;
-
-    const handledMcpInstall = await handleMcpInstallDocument(ctx);
-    if (handledMcpInstall) {
-      return;
-    }
-
     const deps = { bot, ensureEventSubscription };
     await handleDocumentMessage(ctx, deps);
   });
@@ -1421,11 +1406,6 @@ export function createBot(): Bot<Context> {
 
     const handledTask = await handleTaskTextInput(ctx);
     if (handledTask) {
-      return;
-    }
-
-    const handledMcpInstall = await handleMcpInstallTextInput(ctx);
-    if (handledMcpInstall) {
       return;
     }
 

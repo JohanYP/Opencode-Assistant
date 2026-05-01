@@ -12,7 +12,6 @@ export const es: I18nDictionary = {
   "cmd.description.tasklist": "Ver tareas programadas",
   "cmd.description.commands": "Comandos personalizados",
   "cmd.description.skills": "Catálogo de skills",
-  "cmd.description.mcp": "Instalar un nuevo servidor MCP",
   "cmd.description.mcplist": "Listar y alternar servidores MCP",
   "cmd.description.opencode_start": "Iniciar servidor OpenCode",
   "cmd.description.opencode_stop": "Detener servidor OpenCode",
@@ -451,69 +450,6 @@ export const es: I18nDictionary = {
   "tasklist.cancelled_callback": "Cancelado",
   "tasklist.inactive_callback": "Este menú de tareas programadas está inactivo",
   "tasklist.load_error": "🔴 No se pudieron cargar las tareas programadas.",
-
-  "mcp.install.prompt.name":
-    "🔌 Envía un nombre corto para el servidor MCP (letras, números, _ y -). Ejemplo: filesystem",
-  "mcp.install.prompt.type":
-    "Selecciona el tipo de servidor MCP:",
-  "mcp.install.prompt.command":
-    "📝 Envía el comando completo para ejecutar el servidor MCP.\n\nEjemplo:\nnpx -y @modelcontextprotocol/server-filesystem /workspace",
-  "mcp.install.prompt.url":
-    "🌐 Envía la URL del servidor MCP remoto.\n\nEjemplo:\nhttps://mcp.example.com/v1/sse",
-  "mcp.install.prompt.scope":
-    "Elige el alcance de instalación:",
-  "mcp.install.prompt.env":
-    "🔐 Variables de entorno (opcional).\n\nEnvía líneas KEY=valor (una por línea), sube un archivo (.env o credentials.json de Google OAuth), o envía /skip para omitir.\n\nEjemplo:\nGOOGLE_OAUTH_CLIENT_ID=tu-id\nGOOGLE_OAUTH_CLIENT_SECRET=tu-secret",
-  "mcp.install.env_invalid":
-    "⚠️ Formato inválido. Cada línea debe ser KEY=valor con KEY usando solo A-Z, 0-9 y _.",
-  "mcp.install.env_skipped": "✅ Sin variables de entorno.",
-  "mcp.install.json_parsed_oauth":
-    "✅ Detectadas credenciales OAuth de Google. Extraídas: {keys}",
-  "mcp.install.json_parsed_env":
-    "✅ Cargadas {count} variable(s) de entorno desde el archivo.",
-  "mcp.install.json_unrecognized":
-    "⚠️ El archivo no es un credentials.json OAuth ni un .env reconocido. Envía líneas KEY=valor manualmente o /skip.",
-  "mcp.install.file_too_large":
-    "⚠️ Archivo demasiado grande. Tamaño máximo 64KB.",
-  "mcp.install.file_download_error":
-    "🔴 No se pudo descargar el archivo subido.",
-  "mcp.install.preview":
-    "Revisa el servidor MCP antes de instalar:\n\nNombre: {name}\nTipo: {type}\nAlcance: {scope}\n{spec}{envBlock}",
-  "mcp.install.preview.command": "Comando: {command}",
-  "mcp.install.preview.url": "URL: {url}",
-  "mcp.install.preview.env_keys": "\nVariables de entorno ({count}): {keys}",
-  "mcp.install.tunnel_disclaimer":
-    "ℹ️ Este MCP parece basado en OAuth. El flujo OAuth abre una URL de callback la primera vez que se usa.\n\n• PC local: funciona sin más.\n• Docker / VPS / Droplet: el callback a localhost no será accesible. Necesitas un túnel HTTPS público que apunte al container de OpenCode, y luego setear GOOGLE_OAUTH_REDIRECT_URI / WORKSPACE_EXTERNAL_URL acorde.\n\nOpciones gratuitas que funcionan sin verificación:\n• ngrok — `ngrok http 8000`\n• Cloudflared (TryCloudflare) — `cloudflared tunnel --url http://localhost:8000`\n\nAutoriza la URL pública resultante en Google Cloud Console como redirect URI de tu OAuth client.",
-  "mcp.install.scope.global": "🌐 Global (todas las sesiones)",
-  "mcp.install.scope.project": "📁 Solo este proyecto",
-  "mcp.install.scope.global_label": "global",
-  "mcp.install.scope.project_label": "proyecto",
-  "mcp.install.button.local": "🖥️ Local",
-  "mcp.install.button.remote": "🌐 Remoto",
-  "mcp.install.button.global": "🌐 Global",
-  "mcp.install.button.project": "📁 Solo este proyecto",
-  "mcp.install.button.confirm": "✅ Instalar",
-  "mcp.install.button.cancel": "❌ Cancelar",
-  "mcp.install.name_invalid":
-    "⚠️ Nombre no válido. Usa solo letras, números, _ y -, máx. 64 caracteres.",
-  "mcp.install.name_taken":
-    "⚠️ Ya existe un servidor MCP con ese nombre. Elige otro o elimínalo primero.",
-  "mcp.install.command_empty":
-    "⚠️ El comando no puede estar vacío. Envía el comando completo.",
-  "mcp.install.url_invalid":
-    "⚠️ URL no válida. Envía una URL http(s):// válida.",
-  "mcp.install.cancelled": "❌ Instalación de MCP cancelada.",
-  "mcp.install.cancel_callback": "Cancelando...",
-  "mcp.install.installing": "⏳ Instalando servidor MCP...",
-  "mcp.install.success":
-    "✅ MCP instalado: {name} ({type}, {scope}). Estado: {status}",
-  "mcp.install.connect_failed":
-    "⚠️ MCP instalado pero no se pudo conectar: {error}",
-  "mcp.install.error": "🔴 No se pudo instalar el servidor MCP: {error}",
-  "mcp.install.inactive_callback": "Este flujo de instalación de MCP ya no está activo",
-  "mcp.install.inactive": "⚠️ La instalación de MCP no está activa. Ejecuta /mcp otra vez.",
-  "mcp.install.project_not_selected":
-    "🏗 No hay un proyecto seleccionado. Usa /projects o elige alcance global.",
 
   "cron.delivery.continue_button": "▶️ Continuar en sesión activa",
   "cron.delivery.cancel_button": "❌ Descartar",
