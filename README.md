@@ -27,10 +27,7 @@ The assistant remembers who it is and what you've discussed across sessions. At 
 ### OpenClaw Skills Compatibility
 Drop any `SKILL.md` file from the [OpenClaw](https://github.com/topics/openclaw-skills) / [ClawHub](https://github.com/alirezarezvani/claude-skills) ecosystem into `memory/skills/` and the assistant can use it immediately. YAML frontmatter is parsed automatically to show skill names, descriptions, and categories.
 
-Install skills directly from Telegram with one command:
-```
-/skill_install https://raw.githubusercontent.com/alirezarezvani/claude-skills/main/engineering/git-worktree-manager/SKILL.md
-```
+Drop any `.md` file into `memory/skills/` and it will be picked up automatically. The bot loads skills from disk on every `/listskill` call — no install step needed.
 
 ### Cron Jobs — Three Types
 Beyond the basic scheduled tasks, three cron types are supported via `memory/cron.yml`:
@@ -122,8 +119,7 @@ No Node.js needed on your machine — everything runs inside Docker.
 
 ### Personal Assistant Layer
 - **Persistent memory** across sessions (soul, memory, context, session summary)
-- **OpenClaw SKILL.md compatibility** — install any skill from GitHub
-- **`/skill_install <url>`** — install skills directly from Telegram
+- **OpenClaw SKILL.md compatibility** — drop any skill `.md` into `memory/skills/`
 - **Speechify TTS** — free, natural voices, sent as voice notes
 - **TTS accumulation** — one audio per complete response
 - **STT hide text** — silently transcribe voice without showing text
@@ -165,9 +161,8 @@ No Node.js needed on your machine — everything runs inside Docker.
 | `/memory [text]` | View or append to long-term memory |
 | `/context [text]` | View or update project context |
 | `/memfiles` | List all memory files with sizes |
-| `/skills_list` | List available skills with metadata |
+| `/listskill` | List available skills with metadata |
 | `/skill <name>` | View a specific skill |
-| `/skill_install <url>` | Install a skill from a GitHub URL |
 | `/agents_md` | View agent selection instructions |
 
 ---
@@ -417,7 +412,7 @@ Available scripts:
 
 **Skills not showing**
 - Place `.md` files in `memory/skills/`
-- Use `/skills_list` to verify they are detected
+- Use `/listskill` to verify they are detected
 
 ---
 

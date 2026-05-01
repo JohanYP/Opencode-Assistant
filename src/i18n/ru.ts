@@ -19,9 +19,8 @@ export const ru: I18nDictionary = {
   "cmd.description.memory": "Просмотр или обновление долгосрочной памяти",
   "cmd.description.context": "Просмотр или обновление контекста проекта",
   "cmd.description.memfiles": "Список всех файлов памяти",
-  "cmd.description.skills_list": "Список доступных навыков",
+  "cmd.description.listskill": "Список доступных навыков",
   "cmd.description.skill": "Просмотр конкретного навыка",
-  "cmd.description.skill_install": "Установить навык из URL GitHub",
   "cmd.description.help": "Справка",
 
   "callback.unknown_command": "Неизвестная команда",
@@ -245,6 +244,28 @@ export const ru: I18nDictionary = {
   "model.menu.favorites_hint":
     "ℹ️ Добавляйте модели в избранное через OpenCode CLI, чтобы они были вверху списка.",
   "model.menu.error": "🔴 Не удалось получить список моделей",
+
+  "model.menu.category_select": "Выберите категорию:",
+  "model.menu.category_free": "🎁 Бесплатные модели",
+  "model.menu.category_paid": "💳 Платные модели",
+  "model.menu.providers_title": "Выберите провайдера:",
+  "model.menu.providers_empty": "— В этой категории нет провайдеров.",
+  "model.menu.models_title": "Модели {provider}:",
+  "model.menu.button.back": "⬅️ Назад",
+  "model.menu.button.cancel": "❌ Отмена",
+  "model.menu.button.prev": "⬅️ Назад",
+  "model.menu.button.next": "Вперёд ➡️",
+  "model.menu.page": "Страница {page}/{total}",
+  "model.auth.api_prompt":
+    "🔑 Отправьте API-ключ для {provider}.\n\nВаше сообщение будет удалено сразу же, чтобы ключ не остался в истории.",
+  "model.auth.api_invalid": "⚠️ API-ключ пустой. Отправьте снова или /abort.",
+  "model.auth.api_saved": "✅ API-ключ сохранён для {provider}. Выбираю модель...",
+  "model.auth.api_failed": "🔴 Не удалось сохранить API-ключ. Повторите позже.",
+  "model.auth.oauth_link":
+    "🌐 Откройте эту ссылку в браузере, авторизуйтесь у {provider}, затем вернитесь и выберите модель снова:\n{url}\n\n{instructions}",
+  "model.auth.oauth_failed": "🔴 Не удалось запустить OAuth для {provider}.",
+  "model.auth.no_method":
+    "⚠️ Нет метода аутентификации для {provider}. Настройте его сначала в OpenCode CLI.",
 
   "variant.model_not_selected_callback": "Ошибка: модель не выбрана",
   "variant.changed_callback": "Вариант изменен: {name}",

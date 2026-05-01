@@ -19,9 +19,8 @@ export const de: I18nDictionary = {
   "cmd.description.memory": "Langzeitgedächtnis anzeigen oder aktualisieren",
   "cmd.description.context": "Projektkontext anzeigen oder aktualisieren",
   "cmd.description.memfiles": "Alle Gedächtnisdateien auflisten",
-  "cmd.description.skills_list": "Verfügbare Skills auflisten",
+  "cmd.description.listskill": "Verfügbare Skills auflisten",
   "cmd.description.skill": "Einen bestimmten Skill anzeigen",
-  "cmd.description.skill_install": "Einen Skill von einer GitHub-URL installieren",
   "cmd.description.help": "Hilfe",
 
   "callback.unknown_command": "Unbekannter Befehl",
@@ -257,6 +256,28 @@ export const de: I18nDictionary = {
   "model.menu.favorites_hint":
     "ℹ️ Füge Modelle in OpenCode CLI zu den Favoriten hinzu, damit sie oben angezeigt werden.",
   "model.menu.error": "🔴 Modellliste konnte nicht geladen werden",
+
+  "model.menu.category_select": "Kategorie wählen:",
+  "model.menu.category_free": "🎁 Kostenlose Modelle",
+  "model.menu.category_paid": "💳 Kostenpflichtige Modelle",
+  "model.menu.providers_title": "Anbieter wählen:",
+  "model.menu.providers_empty": "— Keine Anbieter in dieser Kategorie.",
+  "model.menu.models_title": "Modelle für {provider}:",
+  "model.menu.button.back": "⬅️ Zurück",
+  "model.menu.button.cancel": "❌ Abbrechen",
+  "model.menu.button.prev": "⬅️ Zurück",
+  "model.menu.button.next": "Weiter ➡️",
+  "model.menu.page": "Seite {page}/{total}",
+  "model.auth.api_prompt":
+    "🔑 Sende den API-Schlüssel für {provider}.\n\nDeine Nachricht wird sofort gelöscht, damit der Schlüssel nicht im Verlauf bleibt.",
+  "model.auth.api_invalid": "⚠️ Der API-Schlüssel scheint leer zu sein. Sende ihn erneut oder /abort.",
+  "model.auth.api_saved": "✅ API-Schlüssel für {provider} gespeichert. Modell wird ausgewählt...",
+  "model.auth.api_failed": "🔴 API-Schlüssel konnte nicht gespeichert werden. Versuche es erneut.",
+  "model.auth.oauth_link":
+    "🌐 Öffne diesen Link im Browser, um dich bei {provider} anzumelden, dann komm zurück und wähle das Modell erneut:\n{url}\n\n{instructions}",
+  "model.auth.oauth_failed": "🔴 OAuth für {provider} konnte nicht gestartet werden.",
+  "model.auth.no_method":
+    "⚠️ Keine Authentifizierungsmethode für {provider} verfügbar. Konfiguriere sie zuerst in OpenCode CLI.",
 
   "variant.model_not_selected_callback": "Fehler: Modell ist nicht ausgewählt",
   "variant.changed_callback": "Variante geändert: {name}",

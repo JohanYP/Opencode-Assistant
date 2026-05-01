@@ -16,9 +16,8 @@ export const en = {
   "cmd.description.memory": "View or update long-term memory",
   "cmd.description.context": "View or update current project context",
   "cmd.description.memfiles": "List all memory files",
-  "cmd.description.skills_list": "List available skills",
+  "cmd.description.listskill": "List available skills",
   "cmd.description.skill": "View a specific skill",
-  "cmd.description.skill_install": "Install a skill from a GitHub URL",
   "cmd.description.help": "Help",
 
   "callback.unknown_command": "Unknown command",
@@ -242,6 +241,28 @@ export const en = {
   "model.menu.favorites_hint":
     "ℹ️ Add models to favorites in OpenCode CLI to keep them at the top.",
   "model.menu.error": "🔴 Failed to get models list",
+
+  "model.menu.category_select": "Select category:",
+  "model.menu.category_free": "🎁 Free models",
+  "model.menu.category_paid": "💳 Paid models",
+  "model.menu.providers_title": "Choose a provider:",
+  "model.menu.providers_empty": "— No providers in this category.",
+  "model.menu.models_title": "Models for {provider}:",
+  "model.menu.button.back": "⬅️ Back",
+  "model.menu.button.cancel": "❌ Cancel",
+  "model.menu.button.prev": "⬅️ Prev",
+  "model.menu.button.next": "Next ➡️",
+  "model.menu.page": "Page {page}/{total}",
+  "model.auth.api_prompt":
+    "🔑 Send the API key for {provider}.\n\nYour message will be deleted right after to keep the key out of chat history.",
+  "model.auth.api_invalid": "⚠️ The API key looks empty. Send it again or /abort.",
+  "model.auth.api_saved": "✅ API key saved for {provider}. Selecting model...",
+  "model.auth.api_failed": "🔴 Failed to save the API key. Try again later.",
+  "model.auth.oauth_link":
+    "🌐 Open this link in your browser to authenticate with {provider}, then come back and pick the model again:\n{url}\n\n{instructions}",
+  "model.auth.oauth_failed": "🔴 Failed to start OAuth for {provider}.",
+  "model.auth.no_method":
+    "⚠️ No auth method available for {provider}. Configure it in OpenCode CLI first.",
 
   "variant.model_not_selected_callback": "Error: model is not selected",
   "variant.changed_callback": "Variant changed: {name}",

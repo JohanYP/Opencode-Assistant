@@ -19,9 +19,8 @@ export const es: I18nDictionary = {
   "cmd.description.memory": "Ver o actualizar la memoria a largo plazo",
   "cmd.description.context": "Ver o actualizar el contexto del proyecto",
   "cmd.description.memfiles": "Listar todos los archivos de memoria",
-  "cmd.description.skills_list": "Listar skills disponibles",
+  "cmd.description.listskill": "Listar skills disponibles",
   "cmd.description.skill": "Ver un skill específico",
-  "cmd.description.skill_install": "Instalar un skill desde una URL de GitHub",
   "cmd.description.help": "Ayuda",
 
   "callback.unknown_command": "Comando desconocido",
@@ -256,6 +255,28 @@ export const es: I18nDictionary = {
   "model.menu.favorites_hint":
     "ℹ️ Agrega modelos a favoritos en OpenCode CLI para mantenerlos arriba de la lista.",
   "model.menu.error": "🔴 No se pudo obtener la lista de modelos",
+
+  "model.menu.category_select": "Selecciona la categoría:",
+  "model.menu.category_free": "🎁 Modelos gratis",
+  "model.menu.category_paid": "💳 Modelos de pago",
+  "model.menu.providers_title": "Elige un proveedor:",
+  "model.menu.providers_empty": "— No hay proveedores en esta categoría.",
+  "model.menu.models_title": "Modelos de {provider}:",
+  "model.menu.button.back": "⬅️ Atrás",
+  "model.menu.button.cancel": "❌ Cancelar",
+  "model.menu.button.prev": "⬅️ Anterior",
+  "model.menu.button.next": "Siguiente ➡️",
+  "model.menu.page": "Página {page}/{total}",
+  "model.auth.api_prompt":
+    "🔑 Envía la API key de {provider}.\n\nTu mensaje será borrado al instante para no dejar la clave en el historial.",
+  "model.auth.api_invalid": "⚠️ La API key parece vacía. Vuelve a enviarla o /abort.",
+  "model.auth.api_saved": "✅ API key guardada para {provider}. Seleccionando modelo...",
+  "model.auth.api_failed": "🔴 No se pudo guardar la API key. Inténtalo de nuevo.",
+  "model.auth.oauth_link":
+    "🌐 Abre este enlace en tu navegador para autenticarte con {provider}, vuelve y selecciona el modelo de nuevo:\n{url}\n\n{instructions}",
+  "model.auth.oauth_failed": "🔴 No se pudo iniciar OAuth para {provider}.",
+  "model.auth.no_method":
+    "⚠️ No hay método de autenticación para {provider}. Configúralo primero en OpenCode CLI.",
 
   "variant.model_not_selected_callback": "Error: no hay un modelo seleccionado",
   "variant.changed_callback": "Variante cambiada: {name}",

@@ -293,6 +293,163 @@ export function __resetModelCatalogCacheForTests(): void {
   modelCatalogFetchInFlight = null;
 }
 
+export interface ProviderModelInfo {
+  id: string;
+  name: string;
+}
+
+export interface ProviderEntry {
+  id: string;
+  name: string;
+  authenticated: boolean;
+  models: ProviderModelInfo[];
+}
+
+export interface CategorizedCatalog {
+  free: ProviderEntry[];
+  paid: ProviderEntry[];
+}
+
+/**
+ * Fetches all providers from OpenCode and splits them into:
+ *  - free: providers already authenticated (provider.key set), ready to use
+ *  - paid: providers without credentials, user must supply an API key or OAuth
+ *
+ * Models are sorted alphabetically inside each provider.
+ */
+export async function getCategorizedCatalog(): Promise<CategorizedCatalog> {
+  try {
+    const response = await opencodeClient.config.providers();
+
+    if (response.error || !response.data) {
+      logger.warn("[ModelManager] Failed to fetch provider catalog:", response.error);
+      return { free: [], paid: [] };
+    }
+
+    const free: ProviderEntry[] = [];
+    const paid: ProviderEntry[] = [];
+
+    for (const provider of response.data.providers) {
+      const models: ProviderModelInfo[] = Object.entries(provider.models)
+        .map(([id, model]) => ({ id, name: model.name ?? id }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+
+      if (models.length === 0) continue;
+
+      const authenticated = Boolean(provider.key);
+      const entry: ProviderEntry = {
+        id: provider.id,
+        name: provider.name,
+        authenticated,
+        models,
+      };
+
+      if (authenticated) {
+        free.push(entry);
+      } else {
+        paid.push(entry);
+      }
+    }
+
+    free.sort((a, b) => a.name.localeCompare(b.name));
+    paid.sort((a, b) => a.name.localeCompare(b.name));
+
+    return { free, paid };
+  } catch (err) {
+    logger.error("[ModelManager] Error fetching provider catalog:", err);
+    return { free: [], paid: [] };
+  }
+}
+
+export interface ProviderAuthMethod {
+  type: "oauth" | "api";
+  label: string;
+}
+
+/**
+ * Returns the auth methods available for a specific provider, or null if
+ * the provider doesn't appear in the auth registry (i.e., no auth needed
+ * or unsupported by this OpenCode version).
+ */
+export async function getProviderAuthMethods(
+  providerID: string,
+): Promise<ProviderAuthMethod[] | null> {
+  try {
+    const response = await opencodeClient.provider.auth();
+
+    if (response.error || !response.data) {
+      logger.warn(
+        `[ModelManager] Failed to fetch auth methods for ${providerID}:`,
+        response.error,
+      );
+      return null;
+    }
+
+    const methods = response.data[providerID];
+    if (!Array.isArray(methods)) return null;
+
+    return methods.map((m) => ({ type: m.type, label: m.label }));
+  } catch (err) {
+    logger.error(`[ModelManager] Error fetching auth methods for ${providerID}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Stores an API key for a provider via OpenCode's auth API.
+ * Invalidates the catalog cache so the provider moves to "free" on next list.
+ */
+export async function setProviderApiKey(providerID: string, apiKey: string): Promise<boolean> {
+  try {
+    const response = await opencodeClient.auth.set({
+      providerID,
+      auth: { type: "api", key: apiKey },
+    });
+
+    if (response.error) {
+      logger.warn(`[ModelManager] auth.set failed for ${providerID}:`, response.error);
+      return false;
+    }
+
+    cachedValidModelKeys = null;
+    modelCatalogCacheExpiresAt = 0;
+    logger.info(`[ModelManager] API key set for provider ${providerID}`);
+    return true;
+  } catch (err) {
+    logger.error(`[ModelManager] Error setting API key for ${providerID}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Triggers OpenCode's OAuth authorization flow for a provider and returns
+ * the URL the user must open to complete login. Returns null on failure.
+ */
+export async function getProviderOAuthUrl(
+  providerID: string,
+  methodIndex = 0,
+): Promise<{ url: string; instructions: string } | null> {
+  try {
+    const response = await opencodeClient.provider.oauth.authorize({
+      providerID,
+      method: methodIndex,
+    });
+
+    if (response.error || !response.data) {
+      logger.warn(`[ModelManager] OAuth authorize failed for ${providerID}:`, response.error);
+      return null;
+    }
+
+    return {
+      url: response.data.url,
+      instructions: response.data.instructions ?? "",
+    };
+  } catch (err) {
+    logger.error(`[ModelManager] Error starting OAuth for ${providerID}:`, err);
+    return null;
+  }
+}
+
 /**
  * Get list of favorite models from OpenCode local state file
  * Falls back to env default model if file is unavailable or empty

@@ -51,7 +51,11 @@ import {
 } from "./handlers/question.js";
 import { handlePermissionCallback, showPermissionRequest } from "./handlers/permission.js";
 import { handleAgentSelect, showAgentSelectionMenu } from "./handlers/agent.js";
-import { handleModelSelect, showModelSelectionMenu } from "./handlers/model.js";
+import {
+  handleModelApiKeyInput,
+  handleModelSelect,
+  showModelSelectionMenu,
+} from "./handlers/model.js";
 import { handleVariantSelect, showVariantSelectionMenu } from "./handlers/variant.js";
 import { handleContextButtonPress, handleCompactConfirm } from "./handlers/context.js";
 import { handleInlineMenuCancel } from "./handlers/inline-menu.js";
@@ -85,8 +89,6 @@ import {
   sendRenderedBotPart,
 } from "./utils/telegram-text.js";
 import { formatAssistantRunFooter } from "./utils/assistant-run-footer.js";
-import { getModelCapabilities, supportsInput } from "../model/capabilities.js";
-import { getStoredModel } from "../model/manager.js";
 import type { FilePartInput } from "@opencode-ai/sdk/v2";
 import { foregroundSessionState } from "../scheduled-task/foreground-state.js";
 import { scheduledTaskRuntime } from "../scheduled-task/runtime.js";
@@ -1110,7 +1112,7 @@ export function createBot(): Bot<Context> {
   bot.command("skills", skillsCommand);
   bot.command("mcplist", mcpsCommand);
 
-  // Memory commands: /soul, /memory, /context, /memfiles, /skills_list, /skill
+  // Memory commands: /soul, /memory, /context, /memfiles, /listskill, /skill
   registerMemoryCommands(bot);
 
   bot.on("message:text", unknownCommandMiddleware);
@@ -1328,26 +1330,6 @@ export function createBot(): Bot<Context> {
       // Get the largest photo (last element in array)
       const largestPhoto = photos[photos.length - 1];
 
-      // Check model capabilities
-      const storedModel = getStoredModel();
-      const capabilities = await getModelCapabilities(storedModel.providerID, storedModel.modelID);
-
-      if (!supportsInput(capabilities, "image")) {
-        logger.warn(
-          `[Bot] Model ${storedModel.providerID}/${storedModel.modelID} doesn't support image input`,
-        );
-        await ctx.reply(t("bot.photo_model_no_image"));
-
-        // Fall back to caption-only if present
-        if (caption.trim().length > 0) {
-          botInstance = bot;
-          chatIdInstance = ctx.chat.id;
-          const promptDeps = { bot, ensureEventSubscription };
-          await processUserPrompt(ctx, caption, promptDeps);
-        }
-        return;
-      }
-
       // Download photo
       await ctx.reply(t("bot.photo_downloading"));
       const downloadedFile = await downloadTelegramFile(ctx.api, largestPhoto.file_id);
@@ -1422,6 +1404,11 @@ export function createBot(): Bot<Context> {
 
     const handledSkillArgs = await handleSkillTextArguments(ctx, promptDeps);
     if (handledSkillArgs) {
+      return;
+    }
+
+    const handledApiKey = await handleModelApiKeyInput(ctx);
+    if (handledApiKey) {
       return;
     }
 

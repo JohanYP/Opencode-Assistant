@@ -19,9 +19,8 @@ export const zh: I18nDictionary = {
   "cmd.description.memory": "查看或更新长期记忆",
   "cmd.description.context": "查看或更新项目上下文",
   "cmd.description.memfiles": "列出所有记忆文件",
-  "cmd.description.skills_list": "列出可用技能",
+  "cmd.description.listskill": "列出可用技能",
   "cmd.description.skill": "查看特定技能",
-  "cmd.description.skill_install": "从 GitHub URL 安装技能",
   "cmd.description.help": "帮助",
 
   "callback.unknown_command": "未知命令",
@@ -216,6 +215,28 @@ export const zh: I18nDictionary = {
   "model.menu.recent_empty": "— 列表为空。",
   "model.menu.favorites_hint": "ℹ️ 可在 OpenCode CLI 中将模型加入收藏，使其显示在列表顶部。",
   "model.menu.error": "🔴 获取模型列表失败",
+
+  "model.menu.category_select": "选择类别：",
+  "model.menu.category_free": "🎁 免费模型",
+  "model.menu.category_paid": "💳 付费模型",
+  "model.menu.providers_title": "选择提供商：",
+  "model.menu.providers_empty": "— 此类别中没有提供商。",
+  "model.menu.models_title": "{provider} 的模型：",
+  "model.menu.button.back": "⬅️ 返回",
+  "model.menu.button.cancel": "❌ 取消",
+  "model.menu.button.prev": "⬅️ 上一页",
+  "model.menu.button.next": "下一页 ➡️",
+  "model.menu.page": "第 {page}/{total} 页",
+  "model.auth.api_prompt":
+    "🔑 请发送 {provider} 的 API key。\n\n你的消息会立即删除，以避免 key 留在聊天记录中。",
+  "model.auth.api_invalid": "⚠️ API key 为空。请重新发送或 /abort。",
+  "model.auth.api_saved": "✅ 已保存 {provider} 的 API key，正在选择模型...",
+  "model.auth.api_failed": "🔴 保存 API key 失败，请稍后重试。",
+  "model.auth.oauth_link":
+    "🌐 在浏览器中打开此链接以使用 {provider} 登录，登录后回到此处再次选择模型：\n{url}\n\n{instructions}",
+  "model.auth.oauth_failed": "🔴 无法为 {provider} 启动 OAuth。",
+  "model.auth.no_method":
+    "⚠️ {provider} 没有可用的认证方法。请先在 OpenCode CLI 中配置。",
 
   "variant.model_not_selected_callback": "错误：未选择模型",
   "variant.changed_callback": "变体已更改：{name}",
