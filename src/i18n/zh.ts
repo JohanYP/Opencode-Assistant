@@ -11,7 +11,6 @@ export const zh: I18nDictionary = {
   "cmd.description.task": "创建定时任务",
   "cmd.description.tasklist": "查看定时任务",
   "cmd.description.commands": "自定义命令",
-  "cmd.description.skills": "技能目录",
   "cmd.description.mcplist": "列出并切换 MCP 服务器",
   "cmd.description.opencode_start": "启动 OpenCode 服务器",
   "cmd.description.opencode_stop": "停止 OpenCode 服务器",
@@ -21,6 +20,7 @@ export const zh: I18nDictionary = {
   "cmd.description.memfiles": "列出所有记忆文件",
   "cmd.description.listskill": "列出可用技能",
   "cmd.description.skill": "查看特定技能",
+  "cmd.description.skill_install": "从 GitHub URL 安装技能",
   "cmd.description.help": "帮助",
 
   "callback.unknown_command": "未知命令",
@@ -53,7 +53,7 @@ export const zh: I18nDictionary = {
   "common.unknown_error": "未知错误",
 
   "start.welcome":
-    "👋 欢迎使用 OpenCode Telegram Bot！\n\n可用命令：\n/projects — 选择项目\n/sessions — 会话列表\n/new — 新建会话\n/commands — 自定义命令\n/skills — 技能目录\n/task — 定时任务\n/tasklist — 定时任务列表\n/status — 状态\n/help — 帮助\n\n请使用底部按钮选择 Agent、模型和变体。",
+    "👋 欢迎使用 OpenCode Telegram Bot！\n\n可用命令：\n/projects — 选择项目\n/sessions — 会话列表\n/new — 新建会话\n/commands — 自定义命令\n/listskill — 列出技能\n/task — 定时任务\n/tasklist — 定时任务列表\n/status — 状态\n/help — 帮助\n\n请使用底部按钮选择 Agent、模型和变体。",
   "help.keyboard_hint": "💡 Agent、模型、变体和上下文操作请使用底部键盘按钮。",
   "help.text":
     "📖 **帮助**\n\n/status - 查看服务器状态\n/sessions - 会话列表\n/new - 创建新会话\n/help - 帮助",
@@ -445,23 +445,6 @@ export const zh: I18nDictionary = {
   "commands.page_empty_callback": "这一页没有命令",
   "commands.page_load_error_callback": "无法加载此页面。请重试。",
 
-  "skills.select": "请选择一个 OpenCode 技能：",
-  "skills.empty": "📭 当前项目没有可用的 OpenCode 技能。",
-  "skills.fetch_error": "🔴 加载 OpenCode 技能失败。",
-  "skills.no_description": "无描述",
-  "skills.button.execute": "✅ 执行",
-  "skills.button.cancel": "❌ 取消",
-  "skills.confirm": "请确认执行技能 {skill}。若需带参数执行，请发送一条包含参数的消息。",
-  "skills.inactive_callback": "该技能菜单已失效",
-  "skills.cancelled_callback": "已取消",
-  "skills.execute_callback": "正在使用技能...",
-  "skills.executing_prefix": "⚡ 使用技能:",
-  "skills.arguments_empty": "⚠️ 参数不能为空。请发送文本或点击执行。",
-  "skills.select_page": "请选择一个 OpenCode 技能（第 {page} 页）：",
-  "skills.button.prev_page": "⬅️ 上一页",
-  "skills.button.next_page": "下一页 ➡️",
-  "skills.page_empty_callback": "这一页没有技能",
-  "skills.page_load_error_callback": "无法加载此页面。请重试。",
 
   "mcps.select": "MCP servers:",
   "mcps.empty": "📭 No MCP servers configured.",

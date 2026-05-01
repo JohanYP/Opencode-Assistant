@@ -312,42 +312,54 @@ export interface CategorizedCatalog {
 
 /**
  * Fetches all providers from OpenCode and splits them into:
- *  - free: providers already authenticated (provider.key set), ready to use
- *  - paid: providers without credentials, user must supply an API key or OAuth
+ *  - free: provider works without the user supplying an API key (already
+ *    authenticated, no auth at all, or only OAuth — e.g. opencode-zen
+ *    with big-pickle / gpt-5-nano which are auth'd via opencode.ai login)
+ *  - paid: provider exposes an "api" auth method and currently has no
+ *    credentials, so the user must paste an API key
  *
  * Models are sorted alphabetically inside each provider.
  */
 export async function getCategorizedCatalog(): Promise<CategorizedCatalog> {
   try {
-    const response = await opencodeClient.config.providers();
+    const [providersResp, authResp] = await Promise.all([
+      opencodeClient.config.providers(),
+      opencodeClient.provider.auth(),
+    ]);
 
-    if (response.error || !response.data) {
-      logger.warn("[ModelManager] Failed to fetch provider catalog:", response.error);
+    if (providersResp.error || !providersResp.data) {
+      logger.warn("[ModelManager] Failed to fetch provider catalog:", providersResp.error);
       return { free: [], paid: [] };
     }
+
+    const authMap: Record<string, Array<{ type: "oauth" | "api"; label: string }>> =
+      authResp.data ?? {};
 
     const free: ProviderEntry[] = [];
     const paid: ProviderEntry[] = [];
 
-    for (const provider of response.data.providers) {
+    for (const provider of providersResp.data.providers) {
       const models: ProviderModelInfo[] = Object.entries(provider.models)
         .map(([id, model]) => ({ id, name: model.name ?? id }))
         .sort((a, b) => a.id.localeCompare(b.id));
 
       if (models.length === 0) continue;
 
-      const authenticated = Boolean(provider.key);
+      const hasKey = Boolean(provider.key);
+      const apiAuthMethods = (authMap[provider.id] ?? []).filter((m) => m.type === "api");
+      const needsUserApiKey = apiAuthMethods.length > 0 && !hasKey;
+
       const entry: ProviderEntry = {
         id: provider.id,
         name: provider.name,
-        authenticated,
+        authenticated: !needsUserApiKey,
         models,
       };
 
-      if (authenticated) {
-        free.push(entry);
-      } else {
+      if (needsUserApiKey) {
         paid.push(entry);
+      } else {
+        free.push(entry);
       }
     }
 

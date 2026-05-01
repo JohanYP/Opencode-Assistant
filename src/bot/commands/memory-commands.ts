@@ -1,12 +1,45 @@
+import https from "node:https";
+import http from "node:http";
 import type { Bot, Context } from "grammy";
 import {
   listSkillsWithMeta,
+  parseSkillFrontmatter,
   readMemoryFile,
   readSkill,
   writeMemoryFile,
+  writeSkill,
   type WritableMemoryFile,
 } from "../../memory/manager.js";
 import { logger } from "../../utils/logger.js";
+
+function downloadUrl(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith("https") ? https : http;
+    const req = client.get(url, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode ?? "unknown"}`));
+        res.resume();
+        return;
+      }
+
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      res.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+      res.on("error", reject);
+    });
+
+    req.on("error", reject);
+    req.setTimeout(15_000, () => {
+      req.destroy(new Error("Request timeout"));
+    });
+  });
+}
+
+function toRawGitHubUrl(url: string): string {
+  return url
+    .replace("https://github.com/", "https://raw.githubusercontent.com/")
+    .replace("/blob/", "/");
+}
 
 const MAX_TELEGRAM_MESSAGE = 4000;
 
@@ -31,7 +64,7 @@ async function sendMemoryFile(
 }
 
 /**
- * Registers all /soul, /memory, /context, /memfiles, /listskill, /skill commands.
+ * Registers /soul, /memory, /context, /memfiles, /listskill, /skill, /skill_install.
  */
 export function registerMemoryCommands(bot: Bot<Context>): void {
   // /soul — view soul.md (read-only)
@@ -181,6 +214,70 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
     } catch (error) {
       logger.error("[MemoryCommands] /skill error:", error);
       await ctx.reply("Failed to read skill");
+    }
+  });
+
+  // /skill_install <url> — install a SKILL.md file from a GitHub URL
+  bot.command("skill_install", async (ctx) => {
+    try {
+      const rawArg = ctx.match?.trim();
+      if (!rawArg) {
+        await ctx.reply(
+          "Usage: /skill_install <url>\n\n" +
+            "Supports raw GitHub URLs and github.com/.../blob/... URLs.\n" +
+            "Example:\n" +
+            "/skill_install https://raw.githubusercontent.com/alirezarezvani/claude-skills/main/engineering/git-worktree-manager/SKILL.md",
+        );
+        return;
+      }
+
+      const url =
+        rawArg.includes("github.com") && rawArg.includes("/blob/")
+          ? toRawGitHubUrl(rawArg)
+          : rawArg;
+
+      const statusMsg = await ctx.reply("Downloading skill...");
+
+      let content: string;
+      try {
+        content = await downloadUrl(url);
+      } catch (downloadErr) {
+        await ctx.api.editMessageText(
+          ctx.chat.id,
+          statusMsg.message_id,
+          `Failed to download skill: ${downloadErr instanceof Error ? downloadErr.message : "unknown error"}\n\nCheck the URL and try again.`,
+        );
+        return;
+      }
+
+      if (!content.trim()) {
+        await ctx.api.editMessageText(
+          ctx.chat.id,
+          statusMsg.message_id,
+          "Downloaded file is empty.",
+        );
+        return;
+      }
+
+      const parsed = parseSkillFrontmatter(content);
+      const urlParts = url.split("/");
+      const urlFilename = urlParts[urlParts.length - 1].replace(/\.md$/i, "");
+      const rawName = parsed?.name ?? urlFilename ?? "unknown-skill";
+      const skillName = rawName.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/^-+|-+$/g, "") || "skill";
+
+      await writeSkill(skillName, content);
+
+      const lines = [`Skill installed: ${skillName}`];
+      if (parsed?.description) lines.push(`Description: ${parsed.description.slice(0, 100)}`);
+      if (parsed?.category) lines.push(`Category: ${parsed.category}`);
+      if (parsed?.version) lines.push(`Version: ${parsed.version}`);
+      lines.push("", `Use /skill ${skillName} to view it.`);
+
+      await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, lines.join("\n"));
+      logger.info(`[MemoryCommands] Installed skill from URL: ${skillName}`);
+    } catch (error) {
+      logger.error("[MemoryCommands] /skill_install error:", error);
+      await ctx.reply("Failed to install skill. Check the URL and try again.");
     }
   });
 }

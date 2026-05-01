@@ -9,7 +9,6 @@ export const en = {
   "cmd.description.task": "Create a scheduled task",
   "cmd.description.tasklist": "List scheduled tasks",
   "cmd.description.commands": "Custom commands",
-  "cmd.description.skills": "Skills catalog",
   "cmd.description.opencode_start": "Start OpenCode server",
   "cmd.description.opencode_stop": "Stop OpenCode server",
   "cmd.description.soul": "View assistant personality (soul.md)",
@@ -18,6 +17,7 @@ export const en = {
   "cmd.description.memfiles": "List all memory files",
   "cmd.description.listskill": "List available skills",
   "cmd.description.skill": "View a specific skill",
+  "cmd.description.skill_install": "Install a skill from a GitHub URL",
   "cmd.description.help": "Help",
 
   "callback.unknown_command": "Unknown command",
@@ -56,7 +56,7 @@ export const en = {
   "common.unknown_error": "unknown error",
 
   "start.welcome":
-    "👋 Welcome to OpenCode Telegram Bot!\n\nUse commands:\n/projects — select project\n/sessions — session list\n/new — new session\n/commands — custom commands\n/skills — skills catalog\n/task — scheduled task\n/tasklist — scheduled tasks\n/status — status\n/help — help\n\nUse the bottom buttons to select the agent, model, and variant.",
+    "👋 Welcome to OpenCode Telegram Bot!\n\nUse commands:\n/projects — select project\n/sessions — session list\n/new — new session\n/commands — custom commands\n/listskill — list skills\n/task — scheduled task\n/tasklist — scheduled tasks\n/status — status\n/help — help\n\nUse the bottom buttons to select the agent, model, and variant.",
   "help.keyboard_hint":
     "💡 Use the bottom keyboard buttons for the agent, model, variant, and context actions.",
   "help.text":
@@ -488,24 +488,6 @@ export const en = {
   "commands.page_empty_callback": "No commands on this page",
   "commands.page_load_error_callback": "Cannot load this page. Please try again.",
 
-  "skills.select": "Choose an OpenCode skill:",
-  "skills.empty": "📭 No OpenCode skills are available for this project.",
-  "skills.fetch_error": "🔴 Failed to load OpenCode skills.",
-  "skills.no_description": "No description",
-  "skills.button.execute": "✅ Execute",
-  "skills.button.cancel": "❌ Cancel",
-  "skills.confirm":
-    "Confirm execution of skill {skill}. To run it with arguments, send the arguments as a message.",
-  "skills.inactive_callback": "This skill menu is inactive",
-  "skills.cancelled_callback": "Cancelled",
-  "skills.execute_callback": "Using skill...",
-  "skills.executing_prefix": "⚡ Using skill:",
-  "skills.arguments_empty": "⚠️ Arguments cannot be empty. Send text or tap Execute.",
-  "skills.select_page": "Choose an OpenCode skill (page {page}):",
-  "skills.button.prev_page": "⬅️ Prev",
-  "skills.button.next_page": "Next ➡️",
-  "skills.page_empty_callback": "No skills on this page",
-  "skills.page_load_error_callback": "Cannot load this page. Please try again.",
 
   "mcps.select": "MCP servers:",
   "mcps.empty": "📭 No MCP servers configured.",

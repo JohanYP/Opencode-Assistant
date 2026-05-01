@@ -32,7 +32,6 @@ const COMMAND_DEFINITIONS: BotCommandI18nDefinition[] = [
   { command: "tasklist", descriptionKey: "cmd.description.tasklist" },
   { command: "rename", descriptionKey: "cmd.description.rename" },
   { command: "commands", descriptionKey: "cmd.description.commands" },
-  { command: "skills", descriptionKey: "cmd.description.skills" },
   { command: "mcplist", descriptionKey: "cmd.description.mcplist" },
   { command: "opencode_start", descriptionKey: "cmd.description.opencode_start" },
   { command: "opencode_stop", descriptionKey: "cmd.description.opencode_stop" },
@@ -43,6 +42,7 @@ const COMMAND_DEFINITIONS: BotCommandI18nDefinition[] = [
   { command: "memfiles", descriptionKey: "cmd.description.memfiles" },
   { command: "listskill", descriptionKey: "cmd.description.listskill" },
   { command: "skill", descriptionKey: "cmd.description.skill" },
+  { command: "skill_install", descriptionKey: "cmd.description.skill_install" },
   { command: "help", descriptionKey: "cmd.description.help" },
 ];
 

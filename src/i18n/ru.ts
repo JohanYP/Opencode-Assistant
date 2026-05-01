@@ -11,7 +11,6 @@ export const ru: I18nDictionary = {
   "cmd.description.task": "Создать задачу по расписанию",
   "cmd.description.tasklist": "Список задач по расписанию",
   "cmd.description.commands": "Пользовательские команды",
-  "cmd.description.skills": "Каталог скиллов",
   "cmd.description.mcplist": "Список и переключение MCP серверов",
   "cmd.description.opencode_start": "Запустить OpenCode сервер",
   "cmd.description.opencode_stop": "Остановить OpenCode сервер",
@@ -21,6 +20,7 @@ export const ru: I18nDictionary = {
   "cmd.description.memfiles": "Список всех файлов памяти",
   "cmd.description.listskill": "Список доступных навыков",
   "cmd.description.skill": "Просмотр конкретного навыка",
+  "cmd.description.skill_install": "Установить навык из URL GitHub",
   "cmd.description.help": "Справка",
 
   "callback.unknown_command": "Неизвестная команда",
@@ -57,7 +57,7 @@ export const ru: I18nDictionary = {
   "common.unknown_error": "неизвестная ошибка",
 
   "start.welcome":
-    "👋 Добро пожаловать в OpenCode Telegram Bot!\n\nИспользуйте команды:\n/projects — выбрать проект\n/sessions — список сессий\n/new — новая сессия\n/commands — пользовательские команды\n/skills — каталог скиллов\n/task — задача по расписанию\n/tasklist — список задач по расписанию\n/status — статус\n/help — справка\n\nАгент, модель и вариант выбираются кнопками внизу.",
+    "👋 Добро пожаловать в OpenCode Telegram Bot!\n\nИспользуйте команды:\n/projects — выбрать проект\n/sessions — список сессий\n/new — новая сессия\n/commands — пользовательские команды\n/listskill — список скиллов\n/task — задача по расписанию\n/tasklist — список задач по расписанию\n/status — статус\n/help — справка\n\nАгент, модель и вариант выбираются кнопками внизу.",
   "help.keyboard_hint":
     "💡 Агент, модель, вариант и действия с контекстом доступны через нижние кнопки клавиатуры.",
   "help.text":
@@ -491,26 +491,6 @@ export const ru: I18nDictionary = {
   "commands.page_load_error_callback":
     "Не удалось загрузить эту страницу. Пожалуйста, попробуйте снова.",
 
-  "skills.select": "Выберите скилл OpenCode:",
-  "skills.empty": "📭 Для этого проекта нет доступных скиллов OpenCode.",
-  "skills.fetch_error": "🔴 Не удалось загрузить список скиллов OpenCode.",
-  "skills.no_description": "Без описания",
-  "skills.button.execute": "✅ Выполнить",
-  "skills.button.cancel": "❌ Отмена",
-  "skills.confirm":
-    "Подтвердите запуск скилла {skill}. Чтобы запустить его с аргументами, отправьте аргументы следующим сообщением.",
-  "skills.inactive_callback": "Это меню скиллов уже неактивно",
-  "skills.cancelled_callback": "Отменено",
-  "skills.execute_callback": "Использую скилл...",
-  "skills.executing_prefix": "⚡ Использую скилл:",
-  "skills.arguments_empty":
-    "⚠️ Аргументы не могут быть пустыми. Отправьте текст или нажмите Выполнить.",
-  "skills.select_page": "Выберите скилл OpenCode (страница {page}):",
-  "skills.button.prev_page": "⬅️ Назад",
-  "skills.button.next_page": "Вперёд ➡️",
-  "skills.page_empty_callback": "На этой странице нет скиллов",
-  "skills.page_load_error_callback":
-    "Не удалось загрузить эту страницу. Пожалуйста, попробуйте снова.",
 
   "mcps.select": "MCP серверы:",
   "mcps.empty": "📭 MCP серверы не настроены.",

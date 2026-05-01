@@ -27,7 +27,11 @@ The assistant remembers who it is and what you've discussed across sessions. At 
 ### OpenClaw Skills Compatibility
 Drop any `SKILL.md` file from the [OpenClaw](https://github.com/topics/openclaw-skills) / [ClawHub](https://github.com/alirezarezvani/claude-skills) ecosystem into `memory/skills/` and the assistant can use it immediately. YAML frontmatter is parsed automatically to show skill names, descriptions, and categories.
 
-Drop any `.md` file into `memory/skills/` and it will be picked up automatically. The bot loads skills from disk on every `/listskill` call — no install step needed.
+Drop any `.md` file into `memory/skills/` and it will be picked up automatically, or install one directly from a GitHub URL:
+
+```
+/skill_install https://raw.githubusercontent.com/alirezarezvani/claude-skills/main/engineering/git-worktree-manager/SKILL.md
+```
 
 ### Cron Jobs — Three Types
 Beyond the basic scheduled tasks, three cron types are supported via `memory/cron.yml`:
@@ -119,7 +123,7 @@ No Node.js needed on your machine — everything runs inside Docker.
 
 ### Personal Assistant Layer
 - **Persistent memory** across sessions (soul, memory, context, session summary)
-- **OpenClaw SKILL.md compatibility** — drop any skill `.md` into `memory/skills/`
+- **OpenClaw SKILL.md compatibility** — drop a `.md` into `memory/skills/` or install via `/skill_install <url>`
 - **Speechify TTS** — free, natural voices, sent as voice notes
 - **TTS accumulation** — one audio per complete response
 - **STT hide text** — silently transcribe voice without showing text
@@ -146,7 +150,6 @@ No Node.js needed on your machine — everything runs inside Docker.
 | `/tts` | Toggle audio replies |
 | `/rename` | Rename current session |
 | `/commands` | Browse and run custom commands |
-| `/skills` | Browse and run OpenCode skills |
 | `/mcps` | Browse and toggle MCP servers |
 | `/task` | Create a scheduled task |
 | `/tasklist` | Browse and delete scheduled tasks |
@@ -163,6 +166,7 @@ No Node.js needed on your machine — everything runs inside Docker.
 | `/memfiles` | List all memory files with sizes |
 | `/listskill` | List available skills with metadata |
 | `/skill <name>` | View a specific skill |
+| `/skill_install <url>` | Install a skill from a GitHub URL |
 | `/agents_md` | View agent selection instructions |
 
 ---

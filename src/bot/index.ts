@@ -34,11 +34,6 @@ import {
   handleCommandsCallback,
   handleCommandTextArguments,
 } from "./commands/commands.js";
-import {
-  skillsCommand,
-  handleSkillsCallback,
-  handleSkillTextArguments,
-} from "./commands/skills.js";
 import { mcpsCommand, handleMcpsCallback } from "./commands/mcps.js";
 import { ttsCommand } from "./commands/tts.js";
 import { registerMemoryCommands } from "./commands/memory-commands.js";
@@ -1109,7 +1104,6 @@ export function createBot(): Bot<Context> {
   bot.command("tasklist", taskListCommand);
   bot.command("rename", renameCommand);
   bot.command("commands", commandsCommand);
-  bot.command("skills", skillsCommand);
   bot.command("mcplist", mcpsCommand);
 
   // Memory commands: /soul, /memory, /context, /memfiles, /listskill, /skill
@@ -1146,7 +1140,6 @@ export function createBot(): Bot<Context> {
       const handledTaskList = await handleTaskListCallback(ctx);
       const handledRenameCancel = await handleRenameCancel(ctx);
       const handledCommands = await handleCommandsCallback(ctx, { bot, ensureEventSubscription });
-      const handledSkills = await handleSkillsCallback(ctx, { bot, ensureEventSubscription });
       const handledMcps = await handleMcpsCallback(ctx);
       const handledCronDelivery = await handleCronDeliveryCallback(ctx, {
         bot,
@@ -1154,7 +1147,7 @@ export function createBot(): Bot<Context> {
       });
 
       logger.debug(
-        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, session=${handledSession}, project=${handledProject}, worktree=${handledWorktree}, open=${handledOpen}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, compactConfirm=${handledCompactConfirm}, task=${handledTask}, taskList=${handledTaskList}, rename=${handledRenameCancel}, commands=${handledCommands}, skills=${handledSkills}, mcps=${handledMcps}, cronDelivery=${handledCronDelivery}`,
+        `[Bot] Callback handled: inlineCancel=${handledInlineCancel}, session=${handledSession}, project=${handledProject}, worktree=${handledWorktree}, open=${handledOpen}, question=${handledQuestion}, permission=${handledPermission}, agent=${handledAgent}, model=${handledModel}, variant=${handledVariant}, compactConfirm=${handledCompactConfirm}, task=${handledTask}, taskList=${handledTaskList}, rename=${handledRenameCancel}, commands=${handledCommands}, mcps=${handledMcps}, cronDelivery=${handledCronDelivery}`,
       );
 
       if (
@@ -1173,7 +1166,6 @@ export function createBot(): Bot<Context> {
         !handledTaskList &&
         !handledRenameCancel &&
         !handledCommands &&
-        !handledSkills &&
         !handledMcps &&
         !handledCronDelivery
       ) {
@@ -1399,11 +1391,6 @@ export function createBot(): Bot<Context> {
     const promptDeps = { bot, ensureEventSubscription };
     const handledCommandArgs = await handleCommandTextArguments(ctx, promptDeps);
     if (handledCommandArgs) {
-      return;
-    }
-
-    const handledSkillArgs = await handleSkillTextArguments(ctx, promptDeps);
-    if (handledSkillArgs) {
       return;
     }
 
