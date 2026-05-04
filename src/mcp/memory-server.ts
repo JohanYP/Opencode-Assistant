@@ -15,6 +15,8 @@ import {
   getRecentFacts,
   searchFacts,
 } from "../memory/repositories/facts.js";
+import { searchFactsByVector } from "../memory/repositories/facts-vector.js";
+import { getEmbeddingDriver } from "../memory/embedding-driver.js";
 import {
   getDocument,
   setDocument,
@@ -196,7 +198,7 @@ export const handleRequest: RequestHandler = async (request: JsonRpcRequest) => 
       return { tools: MEMORY_TOOLS };
 
     case "tools/call":
-      return executeToolCall(request.params as ToolCallParams);
+      return await executeToolCall(request.params as ToolCallParams);
 
     default:
       throw new RpcError(ErrorCode.MethodNotFound, `Method not found: ${request.method}`);
@@ -228,7 +230,7 @@ function requireNumber(args: Record<string, unknown> | undefined, key: string): 
   return args[key] as number;
 }
 
-function executeToolCall(params: ToolCallParams | undefined): unknown {
+async function executeToolCall(params: ToolCallParams | undefined): Promise<unknown> {
   if (!params || typeof params.name !== "string") {
     throw new RpcError(ErrorCode.InvalidParams, "tools/call requires a 'name' parameter");
   }
@@ -276,8 +278,23 @@ function executeToolCall(params: ToolCallParams | undefined): unknown {
       const category =
         args && typeof args.category === "string" ? (args.category as string) : undefined;
       const limit = args && typeof args.limit === "number" ? (args.limit as number) : undefined;
+
+      const driver = getEmbeddingDriver();
+      if (driver) {
+        try {
+          const queryVec = await driver.embedOne(query);
+          const results = searchFactsByVector(queryVec, { limit, category });
+          return asJsonContent({ count: results.length, results, mode: "vector" });
+        } catch (err) {
+          logger.warn(
+            `[MCP] Vector search failed, falling back to LIKE: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+      }
       const results = searchFacts(query, { category, limit });
-      return asJsonContent({ count: results.length, results });
+      return asJsonContent({ count: results.length, results, mode: "like" });
     }
 
     case "fact_recent": {

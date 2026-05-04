@@ -4,7 +4,7 @@ import Database from "better-sqlite3";
 import { logger } from "../utils/logger.js";
 
 const DB_FILENAME = "data.db";
-const LATEST_SCHEMA_VERSION = 1;
+const LATEST_SCHEMA_VERSION = 2;
 
 let dbInstance: Database.Database | null = null;
 
@@ -72,6 +72,10 @@ function runMigrations(db: Database.Database): void {
 
   if (currentVersion < 1) {
     applyMigration(db, 1, migration1);
+  }
+
+  if (currentVersion < 2) {
+    applyMigration(db, 2, migration2);
   }
 }
 
@@ -154,4 +158,19 @@ function migration1(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_next_run ON scheduled_tasks(next_run_at);
   `);
+}
+
+function migration2(db: Database.Database): void {
+  // Track which embedding model produced each vector. When the user
+  // switches models, vectors stored under the old model become useless
+  // (different dim space) — this column lets /memory_reembed find them.
+  // SQLite has no ADD COLUMN IF NOT EXISTS, so check first.
+  const cols = db.prepare("PRAGMA table_info(facts)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "embedding_model")) {
+    db.exec("ALTER TABLE facts ADD COLUMN embedding_model TEXT");
+  }
+  // Partial index so /memory_reembed can find facts pending embedding fast.
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_facts_embedding_null ON facts(id) WHERE embedding IS NULL",
+  );
 }

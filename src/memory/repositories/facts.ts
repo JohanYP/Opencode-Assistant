@@ -1,4 +1,6 @@
 import { getDb } from "../db.js";
+import { getEmbeddingDriver } from "../embedding-driver.js";
+import { embedAndStore } from "./facts-vector.js";
 
 export interface Fact {
   id: number;
@@ -73,6 +75,15 @@ export function addFact(input: AddFactInput): Fact {
   if (!fact) {
     throw new Error(`Failed to read back fact with id=${result.lastInsertRowid}`);
   }
+
+  // Fire-and-forget background embed when a driver is configured. Swallows
+  // its own errors (see embedAndStore) so a flaky provider can't make
+  // fact_add fail. Re-run /memory_reembed to backfill anything missed.
+  const driver = getEmbeddingDriver();
+  if (driver) {
+    void embedAndStore(driver, fact.id, fact.content);
+  }
+
   return fact;
 }
 

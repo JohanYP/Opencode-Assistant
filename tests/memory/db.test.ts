@@ -84,8 +84,19 @@ describe("memory/db", () => {
     const versions = db
       .prepare("SELECT version FROM schema_version ORDER BY version")
       .all() as { version: number }[];
-    expect(versions).toHaveLength(1);
-    expect(versions[0].version).toBe(1);
+    // Each migration runs exactly once. A growing list here is correct;
+    // what matters is that re-opening doesn't add duplicate rows.
+    const distinct = new Set(versions.map((v) => v.version));
+    expect(distinct.size).toBe(versions.length);
+    expect(versions.map((v) => v.version)).toEqual([1, 2]);
+  });
+
+  it("adds the embedding_model column in v2", () => {
+    const db = getDb();
+    const cols = db.prepare("PRAGMA table_info(facts)").all() as { name: string }[];
+    const names = cols.map((c) => c.name);
+    expect(names).toContain("embedding");
+    expect(names).toContain("embedding_model");
   });
 
   it("supports atomic transactions", () => {

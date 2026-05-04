@@ -1,16 +1,21 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetConfigCache } from "../../src/config.js";
 import { closeDb, resetDbInstance } from "../../src/memory/db.js";
+import { __resetEmbeddingDriverForTests } from "../../src/memory/embedding-driver.js";
 import { setDocument } from "../../src/memory/repositories/documents.js";
 import { addFact } from "../../src/memory/repositories/facts.js";
+import { updateFactEmbedding } from "../../src/memory/repositories/facts-vector.js";
 import { installSkill } from "../../src/memory/repositories/skills.js";
 import {
   MEMORY_TOOLS,
   handleRequest,
 } from "../../src/mcp/memory-server.js";
 import { ErrorCode } from "../../src/mcp/transport.js";
+
+const ORIGINAL_FETCH = globalThis.fetch;
 
 interface ToolContent {
   content: Array<{ type: "text"; text: string }>;
@@ -47,6 +52,12 @@ describe("mcp/memory-server", () => {
     closeDb();
     fs.rmSync(tempDir, { recursive: true, force: true });
     delete process.env.MEMORY_DIR;
+    delete process.env.EMBEDDING_BASE_URL;
+    delete process.env.EMBEDDING_MODEL;
+    delete process.env.EMBEDDING_API_KEY;
+    resetConfigCache();
+    __resetEmbeddingDriverForTests();
+    globalThis.fetch = ORIGINAL_FETCH;
   });
 
   describe("MCP protocol scaffolding", () => {
@@ -201,6 +212,58 @@ describe("mcp/memory-server", () => {
         deleted: boolean;
       };
       expect(decoded.deleted).toBe(true);
+    });
+
+    it("fact_search reports mode=like when no embedding driver is configured", async () => {
+      addFact({ content: "kotlin is concise" });
+      const out = decode(await callTool("fact_search", { query: "kotlin" })) as {
+        mode: string;
+        count: number;
+      };
+      expect(out.mode).toBe("like");
+      expect(out.count).toBe(1);
+    });
+
+    it("fact_search returns vector-ranked results when driver is configured", async () => {
+      const aligned = addFact({ content: "aligned" });
+      const opposite = addFact({ content: "opposite" });
+      const MODEL = "test-model";
+      updateFactEmbedding(aligned.id, new Float32Array([1, 0, 0, 0]), MODEL);
+      updateFactEmbedding(opposite.id, new Float32Array([-1, 0, 0, 0]), MODEL);
+
+      process.env.EMBEDDING_BASE_URL = "http://localhost:11434/v1";
+      process.env.EMBEDDING_MODEL = MODEL;
+      resetConfigCache();
+      __resetEmbeddingDriverForTests();
+      globalThis.fetch = vi.fn(async () =>
+        new Response(JSON.stringify({ data: [{ embedding: [1, 0, 0, 0] }] }), { status: 200 }),
+      ) as unknown as typeof fetch;
+
+      const out = decode(await callTool("fact_search", { query: "anything" })) as {
+        mode: string;
+        results: Array<{ content: string; similarity: number }>;
+      };
+      expect(out.mode).toBe("vector");
+      expect(out.results[0].content).toBe("aligned");
+      expect(out.results[0].similarity).toBeCloseTo(1, 5);
+    });
+
+    it("fact_search falls back to LIKE when the driver throws", async () => {
+      addFact({ content: "fallback hit" });
+
+      process.env.EMBEDDING_BASE_URL = "http://localhost:11434/v1";
+      resetConfigCache();
+      __resetEmbeddingDriverForTests();
+      globalThis.fetch = vi.fn(async () => {
+        throw new TypeError("connection refused");
+      }) as unknown as typeof fetch;
+
+      const out = decode(await callTool("fact_search", { query: "fallback" })) as {
+        mode: string;
+        count: number;
+      };
+      expect(out.mode).toBe("like");
+      expect(out.count).toBe(1);
     });
   });
 
