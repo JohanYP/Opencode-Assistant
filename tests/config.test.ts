@@ -16,14 +16,16 @@ describe("config boolean env parsing", () => {
     vi.stubEnv("OPENCODE_MONITOR_INTERVAL_SEC", "");
   });
 
-  it("uses false defaults for hide service message flags", async () => {
+  it("uses shipped defaults for hide service message flags", async () => {
     vi.stubEnv("HIDE_THINKING_MESSAGES", "");
     vi.stubEnv("HIDE_TOOL_CALL_MESSAGES", "");
     vi.stubEnv("HIDE_TOOL_FILE_MESSAGES", "");
 
     const config = await loadConfig();
 
-    expect(config.bot.hideThinkingMessages).toBe(false);
+    // Thinking messages and footer are hidden by default for a cleaner UX;
+    // tool-call and tool-file messages stay visible by default.
+    expect(config.bot.hideThinkingMessages).toBe(true);
     expect(config.bot.hideToolCallMessages).toBe(false);
     expect(config.bot.hideToolFileMessages).toBe(false);
   });
@@ -59,7 +61,7 @@ describe("config boolean env parsing", () => {
 
     const config = await loadConfig();
 
-    expect(config.bot.hideThinkingMessages).toBe(false);
+    expect(config.bot.hideThinkingMessages).toBe(true);
     expect(config.bot.hideToolCallMessages).toBe(false);
     expect(config.bot.hideToolFileMessages).toBe(false);
   });
