@@ -5,12 +5,21 @@
 # at that path on the public registry. Building from npm gives us a
 # predictable image with no registry-auth surprises.
 
-FROM node:22-alpine
+# node:22-slim is Debian-based (glibc). The opencode-ai npm package ships
+# platform-specific binaries via optionalDependencies — those binaries are
+# built against glibc, so on Alpine (musl) none of the optionals match and
+# the wrapper crashes with `spawnSync .../bin/.opencode ENOENT`. Slim with
+# glibc resolves that.
+FROM node:22-slim
 
 # Tools OpenCode frequently shells out to while serving a workspace.
-RUN apk add --no-cache git openssh-client bash curl ca-certificates
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+       git openssh-client bash curl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
-# Install the OpenCode CLI globally.
+# Install the OpenCode CLI globally. The platform-specific binary is
+# pulled in by npm through optionalDependencies on glibc Linux.
 RUN npm install -g opencode-ai@latest
 
 # Default workspace + persistent config locations. Both are mounted as
