@@ -5,7 +5,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
-    "opencode-assistant": "dist/cli.js"
+    "opencode-assistant": "dist/cli.js",
+    "opencode-assistant-memory-mcp": "dist/mcp/main.js"
   },
   "exports": {
     ".": "./dist/index.js",
