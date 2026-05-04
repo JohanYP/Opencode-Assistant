@@ -27,6 +27,8 @@ export const ru: I18nDictionary = {
   "cmd.description.skill_verify": "Проверить целостность sha256 навыков",
   "cmd.description.skill_remove": "Удалить навык",
   "cmd.description.memory_search": "Поиск по сохранённым фактам",
+  "cmd.description.memory_remove": "Удалить сохранённый факт по id",
+  "cmd.description.memory_export": "Экспортировать память в markdown-файлы",
   "cmd.description.help": "Справка",
 
   "callback.unknown_command": "Неизвестная команда",
@@ -126,6 +128,23 @@ export const ru: I18nDictionary = {
   "tts.not_configured": "⚠️ Аудиоответы недоступны. Сначала укажите `TTS_API_URL` и `TTS_API_KEY`.",
   "tts.disabled": "🔇 Аудиоответы выключены глобально.",
   "tts.failed": "⚠️ Не удалось создать аудиоответ.",
+
+  "personality.updated":
+    "✅ Личность обновлена. Открой новую сессию (/new), чтобы изменения применились.",
+  "personality.label": "Личность",
+  "personality.empty_help":
+    "Личность пуста.\n\nИспользуй /personality <текст>, чтобы задать правила поведения. Примеры:\n  /personality всегда обращайся ко мне на «вы». Формальный тон, на русском.\n  /personality краткие ответы, максимум 3 строки\n  /personality отвечай на английском, пока я не переключу язык\n\nPersonality — это про КАК ассистент должен отвечать. Сохраняй ФАКТЫ о себе через /memory или просто скажи ассистенту запомнить.",
+  "personality.error": "Не удалось получить доступ к личности.",
+
+  "show_tools.current_visible": "Сообщения инструментов сейчас ВИДИМЫ.",
+  "show_tools.current_hidden": "Сообщения инструментов сейчас СКРЫТЫ.",
+  "show_tools.usage":
+    "Использование:\n  /show_tools on  — показывать вызовы инструментов (по умолчанию)\n  /show_tools off — скрывать их, видны только ответы ассистента",
+  "show_tools.invalid_value": "Неверное значение. Используй /show_tools on или /show_tools off.",
+  "show_tools.now_visible": "✅ Сообщения инструментов теперь ВИДИМЫ.",
+  "show_tools.now_hidden":
+    "✅ Сообщения инструментов теперь СКРЫТЫ. Будут видны только ответы ассистента.",
+  "show_tools.error": "Не удалось обновить видимость инструментов.",
 
   "projects.empty":
     "📭 Проектов нет.\n\nОткройте директорию в OpenCode и создайте хотя бы одну сессию, после этого она появится здесь.",

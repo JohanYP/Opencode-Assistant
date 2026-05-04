@@ -27,6 +27,8 @@ export const es: I18nDictionary = {
   "cmd.description.skill_verify": "Verificar integridad sha256 de los skills",
   "cmd.description.skill_remove": "Desinstalar un skill",
   "cmd.description.memory_search": "Buscar en los datos guardados",
+  "cmd.description.memory_remove": "Eliminar un dato guardado por id",
+  "cmd.description.memory_export": "Exportar memoria a archivos markdown",
   "cmd.description.help": "Ayuda",
 
   "callback.unknown_command": "Comando desconocido",
@@ -133,6 +135,23 @@ export const es: I18nDictionary = {
     "⚠️ Las respuestas de audio no estan disponibles. Configura primero `TTS_API_URL` y `TTS_API_KEY`.",
   "tts.disabled": "🔇 Respuestas de audio desactivadas globalmente.",
   "tts.failed": "⚠️ No se pudo generar la respuesta de audio.",
+
+  "personality.updated":
+    "✅ Personalidad actualizada. Abre una sesión nueva (/new) para que el cambio se aplique.",
+  "personality.label": "Personalidad",
+  "personality.empty_help":
+    "Personalidad vacía.\n\nUsa /personality <texto> para definir reglas de comportamiento. Ejemplos:\n  /personality dime siempre \"señor\". Tono formal, en español.\n  /personality respuestas concisas, máximo 3 líneas\n  /personality habla en inglés salvo que pregunte en otro idioma\n\nPersonality es para CÓMO quieres que responda el asistente. Guarda DATOS sobre ti con /memory o pidiéndole al asistente que los recuerde.",
+  "personality.error": "No se pudo acceder a la personalidad.",
+
+  "show_tools.current_visible": "Los mensajes de herramientas están actualmente VISIBLES.",
+  "show_tools.current_hidden": "Los mensajes de herramientas están actualmente OCULTOS.",
+  "show_tools.usage":
+    "Uso:\n  /show_tools on  — mostrar llamadas a herramientas (por defecto)\n  /show_tools off — ocultarlas, solo aparece la respuesta del asistente",
+  "show_tools.invalid_value": "Valor inválido. Usa /show_tools on o /show_tools off.",
+  "show_tools.now_visible": "✅ Los mensajes de herramientas ahora son VISIBLES.",
+  "show_tools.now_hidden":
+    "✅ Los mensajes de herramientas ahora están OCULTOS. Solo aparecerán las respuestas del asistente.",
+  "show_tools.error": "No se pudo actualizar la visibilidad de las herramientas.",
 
   "projects.empty":
     "📭 No se encontraron proyectos.\n\nAbre un directorio en OpenCode y crea al menos una sesión; entonces aparecerá aquí.",

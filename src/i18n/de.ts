@@ -27,6 +27,8 @@ export const de: I18nDictionary = {
   "cmd.description.skill_verify": "sha256-Integrität der Skills prüfen",
   "cmd.description.skill_remove": "Skill deinstallieren",
   "cmd.description.memory_search": "In gespeicherten Fakten suchen",
+  "cmd.description.memory_remove": "Einen gespeicherten Fakt nach ID löschen",
+  "cmd.description.memory_export": "Speicher in Markdown-Dateien exportieren",
   "cmd.description.help": "Hilfe",
 
   "callback.unknown_command": "Unbekannter Befehl",
@@ -133,6 +135,23 @@ export const de: I18nDictionary = {
     "⚠️ Audioantworten sind nicht verfugbar. Setze zuerst `TTS_API_URL` und `TTS_API_KEY`.",
   "tts.disabled": "🔇 Audioantworten global deaktiviert.",
   "tts.failed": "⚠️ Audioreply konnte nicht erzeugt werden.",
+
+  "personality.updated":
+    "✅ Persönlichkeit aktualisiert. Öffne eine neue Sitzung (/new), damit die Änderung angewendet wird.",
+  "personality.label": "Persönlichkeit",
+  "personality.empty_help":
+    "Persönlichkeit ist leer.\n\nVerwende /personality <text>, um Verhaltensregeln festzulegen. Beispiele:\n  /personality sprich mich immer mit \"Sir\" an. Formeller Ton, auf Deutsch.\n  /personality knappe Antworten, maximal 3 Zeilen\n  /personality antworte auf Englisch, außer ich wechsle die Sprache\n\nPersonality ist für das WIE der Assistent antworten soll. Speichere FAKTEN über dich mit /memory oder indem du dem Assistenten sagst, dass er sich etwas merken soll.",
+  "personality.error": "Persönlichkeit konnte nicht abgerufen werden.",
+
+  "show_tools.current_visible": "Tool-Nachrichten sind derzeit SICHTBAR.",
+  "show_tools.current_hidden": "Tool-Nachrichten sind derzeit AUSGEBLENDET.",
+  "show_tools.usage":
+    "Verwendung:\n  /show_tools on  — Tool-Aufrufe anzeigen (Standard)\n  /show_tools off — verbergen, nur Antworten des Assistenten anzeigen",
+  "show_tools.invalid_value": "Ungültiger Wert. Verwende /show_tools on oder /show_tools off.",
+  "show_tools.now_visible": "✅ Tool-Nachrichten sind jetzt SICHTBAR.",
+  "show_tools.now_hidden":
+    "✅ Tool-Nachrichten sind jetzt AUSGEBLENDET. Nur Assistenten-Antworten erscheinen.",
+  "show_tools.error": "Tool-Sichtbarkeit konnte nicht aktualisiert werden.",
 
   "projects.empty":
     "📭 Keine Projekte gefunden.\n\nÖffne ein Verzeichnis in OpenCode und erstelle mindestens eine Sitzung, dann erscheint es hier.",

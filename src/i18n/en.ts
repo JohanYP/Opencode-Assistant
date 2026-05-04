@@ -24,6 +24,8 @@ export const en = {
   "cmd.description.skill_verify": "Check sha256 integrity of installed skills",
   "cmd.description.skill_remove": "Uninstall a skill",
   "cmd.description.memory_search": "Search saved facts",
+  "cmd.description.memory_remove": "Delete a saved fact by id",
+  "cmd.description.memory_export": "Export memory to markdown files",
   "cmd.description.help": "Help",
 
   "callback.unknown_command": "Unknown command",
@@ -126,6 +128,22 @@ export const en = {
     "⚠️ Audio replies are unavailable. Set `TTS_API_URL` and `TTS_API_KEY` first.",
   "tts.disabled": "🔇 Audio replies disabled globally.",
   "tts.failed": "⚠️ Failed to generate audio reply.",
+
+  "personality.updated":
+    "✅ Personality updated. Open a new session (/new) for the change to apply.",
+  "personality.label": "Personality",
+  "personality.empty_help":
+    "Personality is empty.\n\nUse /personality <text> to set behaviour rules. Examples:\n  /personality always address me as \"sir\". Formal tone, replies in English.\n  /personality concise responses, max 3 lines\n  /personality reply in English unless I explicitly switch language\n\nPersonality is for HOW you want the assistant to respond. Save FACTS about you with /memory or by telling the assistant to remember them.",
+  "personality.error": "Failed to access personality.",
+
+  "show_tools.current_visible": "Tool messages are currently VISIBLE.",
+  "show_tools.current_hidden": "Tool messages are currently HIDDEN.",
+  "show_tools.usage":
+    "Usage:\n  /show_tools on  — show tool calls (default)\n  /show_tools off — hide them, only assistant responses appear",
+  "show_tools.invalid_value": "Invalid value. Use /show_tools on or /show_tools off.",
+  "show_tools.now_visible": "✅ Tool messages are now VISIBLE.",
+  "show_tools.now_hidden": "✅ Tool messages are now HIDDEN. Only assistant responses will appear.",
+  "show_tools.error": "Failed to update tool visibility setting.",
 
   "projects.empty":
     "📭 No projects found.\n\nOpen a directory in OpenCode and create at least one session, then it will appear here.",

@@ -32,6 +32,7 @@ import {
   type SkillStatus,
 } from "../../memory/skill-service.js";
 import { getUiPreferences, setUiPreferences } from "../../settings/manager.js";
+import { t } from "../../i18n/index.js";
 
 const MAX_TELEGRAM_MESSAGE = 4000;
 
@@ -139,31 +140,19 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
       if (arg) {
         setDocument("personality", arg);
         appendAudit("document_updated", { name: "personality", source: "telegram" });
-        await ctx.reply(
-          "Personality updated. Open a new session (/new) for the change to apply " +
-            "to the assistant's behaviour.",
-        );
+        await ctx.reply(t("personality.updated"));
         return;
       }
 
       const doc = getDocument("personality");
       if (!doc || !doc.content.trim()) {
-        await ctx.reply(
-          "Personality is empty.\n\n" +
-            "Use /personality <text> to set behaviour rules. Examples:\n" +
-            '  /personality dime siempre "señor". Tono formal y en español.\n' +
-            "  /personality respuestas concisas, máximo 3 líneas\n" +
-            "  /personality habla siempre en inglés salvo que pregunte explícitamente en otro idioma\n\n" +
-            "Personality is for HOW you want the assistant to respond. " +
-            "Save FACTS about you with /memory or by telling the assistant to " +
-            "remember them.",
-        );
+        await ctx.reply(t("personality.empty_help"));
         return;
       }
-      await ctx.reply(`Personality\n\n${truncate(doc.content)}`);
+      await ctx.reply(`${t("personality.label")}\n\n${truncate(doc.content)}`);
     } catch (error) {
       logger.error("[MemoryCommands] /personality error:", error);
-      await ctx.reply("Failed to access personality.");
+      await ctx.reply(t("personality.error"));
     }
   });
 
@@ -175,12 +164,10 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
       const current = getUiPreferences().showToolMessages;
 
       if (!arg) {
-        await ctx.reply(
-          `Tool messages are currently ${current ? "VISIBLE" : "HIDDEN"}.\n\n` +
-            "Usage:\n" +
-            "  /show_tools on  — show tool calls (default)\n" +
-            "  /show_tools off — hide them, only assistant responses appear",
-        );
+        const stateLine = current
+          ? t("show_tools.current_visible")
+          : t("show_tools.current_hidden");
+        await ctx.reply(`${stateLine}\n\n${t("show_tools.usage")}`);
         return;
       }
 
@@ -190,19 +177,15 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
       } else if (arg === "off" || arg === "false" || arg === "no" || arg === "0") {
         next = false;
       } else {
-        await ctx.reply("Invalid value. Use /show_tools on or /show_tools off.");
+        await ctx.reply(t("show_tools.invalid_value"));
         return;
       }
 
       await setUiPreferences({ showToolMessages: next });
-      await ctx.reply(
-        next
-          ? "Tool messages are now VISIBLE."
-          : "Tool messages are now HIDDEN. Only assistant responses will appear.",
-      );
+      await ctx.reply(next ? t("show_tools.now_visible") : t("show_tools.now_hidden"));
     } catch (error) {
       logger.error("[MemoryCommands] /show_tools error:", error);
-      await ctx.reply("Failed to update tool visibility setting.");
+      await ctx.reply(t("show_tools.error"));
     }
   });
 

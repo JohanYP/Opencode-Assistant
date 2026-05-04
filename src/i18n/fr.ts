@@ -27,6 +27,8 @@ export const fr: I18nDictionary = {
   "cmd.description.skill_verify": "Vérifier l'intégrité sha256 des compétences",
   "cmd.description.skill_remove": "Désinstaller une compétence",
   "cmd.description.memory_search": "Rechercher dans les faits enregistrés",
+  "cmd.description.memory_remove": "Supprimer un fait enregistré par id",
+  "cmd.description.memory_export": "Exporter la mémoire en fichiers markdown",
   "cmd.description.help": "Aide",
 
   "callback.unknown_command": "Commande inconnue",
@@ -134,6 +136,23 @@ export const fr: I18nDictionary = {
     "⚠️ Les réponses audio ne sont pas disponibles. Définissez d'abord `TTS_API_URL` et `TTS_API_KEY`.",
   "tts.disabled": "🔇 Réponses audio désactivées globalement.",
   "tts.failed": "⚠️ Impossible de générer la réponse audio.",
+
+  "personality.updated":
+    "✅ Personnalité mise à jour. Ouvre une nouvelle session (/new) pour que le changement s'applique.",
+  "personality.label": "Personnalité",
+  "personality.empty_help":
+    "Personnalité vide.\n\nUtilise /personality <texte> pour définir des règles de comportement. Exemples :\n  /personality appelle-moi toujours \"monsieur\". Ton formel, en français.\n  /personality réponses concises, maximum 3 lignes\n  /personality réponds en anglais sauf si je change de langue\n\nPersonality concerne COMMENT tu veux que l'assistant réponde. Enregistre des FAITS sur toi avec /memory ou en demandant à l'assistant de s'en souvenir.",
+  "personality.error": "Impossible d'accéder à la personnalité.",
+
+  "show_tools.current_visible": "Les messages d'outils sont actuellement VISIBLES.",
+  "show_tools.current_hidden": "Les messages d'outils sont actuellement MASQUÉS.",
+  "show_tools.usage":
+    "Utilisation :\n  /show_tools on  — afficher les appels d'outils (par défaut)\n  /show_tools off — les masquer, seules les réponses de l'assistant apparaissent",
+  "show_tools.invalid_value": "Valeur invalide. Utilise /show_tools on ou /show_tools off.",
+  "show_tools.now_visible": "✅ Les messages d'outils sont maintenant VISIBLES.",
+  "show_tools.now_hidden":
+    "✅ Les messages d'outils sont maintenant MASQUÉS. Seules les réponses de l'assistant apparaîtront.",
+  "show_tools.error": "Impossible de mettre à jour la visibilité des outils.",
 
   "projects.empty":
     "📭 Aucun projet trouvé.\n\nOuvrez un répertoire dans OpenCode et créez au moins une session, il apparaîtra ensuite ici.",

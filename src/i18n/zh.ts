@@ -27,6 +27,8 @@ export const zh: I18nDictionary = {
   "cmd.description.skill_verify": "检查已安装技能的 sha256 完整性",
   "cmd.description.skill_remove": "卸载技能",
   "cmd.description.memory_search": "搜索已保存的事实",
+  "cmd.description.memory_remove": "按 id 删除已保存的事实",
+  "cmd.description.memory_export": "将记忆导出为 markdown 文件",
   "cmd.description.help": "帮助",
 
   "callback.unknown_command": "未知命令",
@@ -116,6 +118,21 @@ export const zh: I18nDictionary = {
   "tts.not_configured": "⚠️ 语音回复暂不可用。请先设置 `TTS_API_URL` 和 `TTS_API_KEY`。",
   "tts.disabled": "🔇 已全局关闭语音回复。",
   "tts.failed": "⚠️ 生成语音回复失败。",
+
+  "personality.updated": "✅ 个性已更新。开启新会话 (/new) 以使更改生效。",
+  "personality.label": "个性",
+  "personality.empty_help":
+    "个性为空。\n\n使用 /personality <文本> 设置行为规则。示例：\n  /personality 始终称呼我为\"先生\"。语气正式，使用中文。\n  /personality 简洁的回复，最多 3 行\n  /personality 用英文回复，除非我切换语言\n\nPersonality 是关于助手应如何回复你的。使用 /memory 或让助手记住的方式来保存关于你的事实。",
+  "personality.error": "无法访问个性设置。",
+
+  "show_tools.current_visible": "工具消息当前可见。",
+  "show_tools.current_hidden": "工具消息当前已隐藏。",
+  "show_tools.usage":
+    "用法：\n  /show_tools on  — 显示工具调用（默认）\n  /show_tools off — 隐藏，仅显示助手的回复",
+  "show_tools.invalid_value": "无效值。使用 /show_tools on 或 /show_tools off。",
+  "show_tools.now_visible": "✅ 工具消息现在可见。",
+  "show_tools.now_hidden": "✅ 工具消息现在已隐藏。仅显示助手的回复。",
+  "show_tools.error": "无法更新工具可见性设置。",
 
   "projects.empty":
     "📭 未找到项目。\n\n在 OpenCode 中打开一个目录并至少创建一个会话，然后它会出现在这里。",
