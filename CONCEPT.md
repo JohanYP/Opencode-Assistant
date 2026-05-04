@@ -1,12 +1,23 @@
 # Concept
 
-This document defines the current product concept and boundaries for OpenCode Telegram Bot.
+This document defines the current product concept and boundaries for Opencode-Assistant.
 
 ## Vision
 
-OpenCode Telegram Bot is designed as a **single OpenCode CLI window in Telegram**.
+Opencode-Assistant is designed as a **personal AI assistant on Telegram, with a single OpenCode CLI window at its core**.
 
 The goal is to provide a simple, reliable, mobile-friendly way to run and monitor OpenCode workflows from Telegram while keeping behavior predictable.
+
+## Who is this for
+
+Opencode-Assistant targets **power users running their own instance** — typically self-hosters with a server, Raspberry Pi, or always-on laptop, comfortable with Docker and a guided setup wizard but not necessarily developers. The intended adopter wants:
+
+- A personal AI assistant that lives in Telegram (no separate app to maintain).
+- Persistent memory across sessions, without paying subscriptions.
+- Skills compatible with the broader OpenClaw / Claude-skills ecosystem.
+- A single-command install (`docker compose up -d`) and update flow (`git pull && docker compose up -d`).
+
+Each adopter runs their **own** instance for themselves. This is **not** a hosted multi-tenant service, and the bot is **not** designed to serve multiple Telegram users from a single instance. The design optimizes for one person owning their data and their bot end-to-end.
 
 ## Core Concept
 
@@ -44,10 +55,12 @@ Source: https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avo
 
 The project priorities are intentionally long-term and concept-aligned:
 
-- Keep the bot stable and behavior predictable in daily use
-- Expand functionality within the current concept boundaries
-- Improve test coverage and maintainability for safe iteration
-- Evolve the architecture without changing the core interaction model
+- Keep the bot stable and behavior predictable in daily use.
+- Make the project distributable for power users: one install path (Docker), simple update flow.
+- Move memory, context, skills and scheduled tasks to **SQLite as source of truth**, exposed to OpenCode through a local **MCP server** so memory becomes live across sessions instead of a snapshot at session start.
+- Improve and align skills tooling with the OpenClaw / Claude-skills ecosystem (registry, integrity, validation).
+- Improve test coverage and maintainability for safe iteration.
+- Evolve the architecture without changing the core interaction model.
 
 ## Change Policy
 

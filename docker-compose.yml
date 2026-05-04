@@ -1,5 +1,4 @@
 services:
-  # OpenCode server — only included in full Docker mode
   opencode:
     image: ghcr.io/sst/opencode:latest
     command: serve --port 4096
@@ -7,10 +6,7 @@ services:
       - ./memory:/workspace/memory
       - opencode-config:/root/.config/opencode
     restart: unless-stopped
-    profiles:
-      - full
 
-  # Telegram bot — always included
   bot:
     build:
       context: .
@@ -18,11 +14,6 @@ services:
     depends_on:
       opencode:
         condition: service_started
-        required: false
-    # Allow the bot to reach OpenCode running on the host machine (bot-only mode).
-    # host.docker.internal resolves to the host IP on Linux, macOS and Windows.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./memory:/app/memory
       - bot-data:/app/data

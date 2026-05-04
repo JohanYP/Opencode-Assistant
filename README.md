@@ -10,6 +10,8 @@ A fully-featured **personal AI assistant** running in Telegram, powered by [Open
 
 Persistent memory across sessions, scheduled tasks with continue/cancel buttons that inject results into your active chat, voice replies, and one-command MCP server installation. Deploy in minutes with a single guided setup script. Everything runs locally on your machine or server.
 
+> **Roadmap note**: the project is moving toward SQLite-backed memory exposed to OpenCode through a local MCP server (memory becomes live across sessions instead of a snapshot at session start), and Docker becoming the only supported install path. See [`PRODUCT.md`](./PRODUCT.md#roadmap) and [`CONCEPT.md`](./CONCEPT.md) for the direction.
+
 ---
 
 ## Highlights
@@ -58,13 +60,10 @@ Beyond the basic scheduled tasks, three cron types are supported via `memory/cro
 - Both can be re-enabled via environment variables
 
 ### Guided Setup Wizard
-An interactive `setup.sh` script guides you through the full configuration in 11 steps — no manual `.env` editing needed.
+An interactive `setup.sh` script guides you through the full configuration in 10 steps — no manual `.env` editing needed.
 
-### Two Installation Modes
-| Mode | Recommended for | Description |
-|---|---|---|
-| **Full Docker** | VPS, servers, any environment | OpenCode + Bot both in Docker, fully isolated |
-| **Bot-only** | Your personal PC (trusted env) | Bot in Docker, OpenCode installed as a system service (systemd/launchd) |
+### Single Install Path: Docker
+Everything runs in Docker — bot and OpenCode together. Updates are a one-liner: `git pull && docker compose up -d --build`. No systemd, no launchd, no `host.docker.internal`.
 
 ---
 
@@ -77,17 +76,16 @@ cd Opencode-Assistant
 ```
 
 The wizard will ask for:
-1. Installation mode (Full Docker / Bot-only)
-2. Bot language (en/es/de/fr/ru/zh)
-3. Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
-4. Your Telegram User ID (from [@userinfobot](https://t.me/userinfobot))
-5. AI model (`big-pickle` free by default)
-6. TTS provider (Speechify recommended — free)
-7. STT provider (Groq Whisper recommended — free)
-8. Timezone (auto-detected)
-9. Assistant personality (name, tone, instructions)
-10. Interface options (thinking messages, footer)
-11. Optional OpenClaw skills to install from GitHub
+1. Bot language (en/es/de/fr/ru/zh)
+2. Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
+3. Your Telegram User ID (from [@userinfobot](https://t.me/userinfobot))
+4. AI model (`big-pickle` free by default)
+5. TTS provider (Speechify recommended — free)
+6. STT provider (Groq Whisper recommended — free)
+7. Timezone (auto-detected)
+8. Assistant personality (name, tone, instructions)
+9. Interface options (thinking messages, footer)
+10. Optional OpenClaw skills to install from GitHub
 
 At the end it generates `.env`, all memory files, and launches Docker automatically.
 
@@ -97,9 +95,8 @@ At the end it generates `.env`, all memory files, and launches Docker automatica
 
 - **Docker** with Compose v2 — [install](https://docs.docker.com/get-docker/)
 - **Telegram Bot** — created via [@BotFather](https://t.me/BotFather) during setup
-- **OpenCode** — only needed for bot-only mode (setup.sh installs it automatically)
 
-No Node.js needed on your machine — everything runs inside Docker.
+No Node.js or OpenCode binary needed on your machine — everything runs inside Docker.
 
 ---
 
@@ -131,7 +128,6 @@ No Node.js needed on your machine — everything runs inside Docker.
 - **`type: backup`** cron — automatic memory file backups
 - **`memory/cron.yml`** — define cron jobs as a file, synced with `/task`
 - **Hidden thinking + footer** by default for cleaner UX
-- **Bot-only mode** with systemd/launchd auto-install
 
 ---
 
@@ -266,7 +262,7 @@ All variables are set automatically by `setup.sh`. Reference for manual configur
 ### OpenCode
 | Variable | Default | Description |
 |---|---|---|
-| `OPENCODE_API_URL` | `http://opencode:4096` | Full Docker; use `http://localhost:4096` for bot-only |
+| `OPENCODE_API_URL` | `http://opencode:4096` | Internal compose-network address of the OpenCode container |
 | `OPENCODE_MODEL_PROVIDER` | `opencode` | Model provider |
 | `OPENCODE_MODEL_ID` | `big-pickle` | Model ID (`big-pickle` = Claude Sonnet, free) |
 | `OPENCODE_AUTO_RESTART_ENABLED` | `false` | Auto-restart OpenCode on health check failure |
@@ -312,26 +308,19 @@ All variables are set automatically by `setup.sh`. Reference for manual configur
 
 ---
 
-## Installation Modes
+## Installation
 
-### Full Docker (Recommended)
-
-Everything runs in Docker. Best for VPS, servers, or any environment where you want full isolation.
-
-```bash
-docker compose --profile full up -d
-```
-
-### Bot-only (Trusted environments — your personal PC)
-
-The bot runs in Docker, OpenCode runs as a system service on your machine. You can edit files locally and OpenCode sees them in real time.
-
-> **Warning:** OpenCode runs with access to your file system. Only use this mode on your personal machine.
-
-`setup.sh` installs OpenCode as a system service automatically (systemd on Linux, launchd on macOS).
+Everything runs in Docker. Bot and OpenCode share a compose network.
 
 ```bash
 docker compose up -d
+```
+
+To update later:
+
+```bash
+git pull
+docker compose up -d --build
 ```
 
 ---
@@ -367,44 +356,14 @@ Available scripts:
 - Verify the bot token is correct
 
 **"OpenCode server is not available"**
-- Full Docker: make sure you used `--profile full` when starting
-- Bot-only: check OpenCode service is running (`systemctl status opencode` or check Activity Monitor on macOS)
-- Verify `OPENCODE_API_URL` is correct for your mode
+- Confirm both containers are up: `docker compose ps` should show `opencode` and `bot` running.
+- Check the OpenCode container logs: `docker compose logs opencode`.
+- Verify `OPENCODE_API_URL=http://opencode:4096` in `.env` (compose-network address).
+- Restart everything: `docker compose down && docker compose up -d`.
 
-**Bot-only (hybrid) mode: bot can't reach OpenCode on the host**
-- OpenCode must bind to `0.0.0.0`, not `127.0.0.1`. Check:
-  ```bash
-  ss -tlnp | grep 4096   # expect 0.0.0.0:4096, NOT 127.0.0.1:4096
-  ```
-  If you see `127.0.0.1`, the systemd unit is missing `--hostname 0.0.0.0`. Re-run `./setup.sh` or edit `/etc/systemd/system/opencode.service` (or `~/.config/systemd/user/opencode.service`) and add it to `ExecStart`, then `sudo systemctl daemon-reload && sudo systemctl restart opencode`.
-- If UFW is active, allow Docker bridge traffic:
-  ```bash
-  sudo ufw allow from 172.17.0.0/16 to any port 4096 proto tcp
-  ```
-- Confirm `OPENCODE_API_URL=http://host.docker.internal:4096` is set in `.env`.
-- From inside the bot container, test the connection:
-  ```bash
-  docker compose exec bot sh -c "wget -qO- --timeout=3 http://host.docker.internal:4096/" && echo OK
-  ```
-
-**OpenCode does not start at boot (systemd)**
-- If `setup.sh` ran without sudo, it may have installed only a *user-level* unit. User services don't run on a headless server unless lingering is enabled:
-  ```bash
-  sudo loginctl enable-linger "$USER"
-  ```
-- Better: re-run `./setup.sh` with sudo available so it installs a *system-level* unit at `/etc/systemd/system/opencode.service`, which starts at boot regardless of login state.
-
-**`setup.sh` failed to install Docker or OpenCode**
-- Inspect the install log: `cat /tmp/opencode-setup.log`
-- Manual fallback for OpenCode:
-  ```bash
-  curl -fsSL https://opencode.ai/install | sh
-  # or
-  npm install -g opencode-ai
-  # or
-  bun install -g opencode-ai
-  ```
-- Manual fallback for Docker: https://docs.docker.com/engine/install/
+**`setup.sh` failed to install Docker**
+- Inspect the install log: `cat /tmp/opencode-setup.log`.
+- Manual fallback for Docker: https://docs.docker.com/engine/install/.
 
 **Memory not injected**
 - Check `MEMORY_INJECT_ENABLED=true` in `.env`
@@ -437,8 +396,12 @@ Available scripts:
 
 ## Acknowledgments
 
-- **[grinev/opencode-telegram-bot](https://github.com/grinev/opencode-telegram-bot)** by [Ruslan Grinev](https://github.com/grinev) — the original bot this project is based on. All core Telegram/OpenCode integration, session management, SSE event handling, and architecture are his work.
-- **[OpenCode](https://opencode.ai)** by [SST](https://github.com/sst/opencode) — the AI coding agent powering everything.
+Opencode-Assistant is an independent personal-assistant project. Historically it began as work on top of an open-source Telegram bot client for OpenCode and has since evolved into its own product with a persistent memory system, OpenClaw skills, cron jobs with continue/cancel deliveries, voice TTS/STT, and a guided setup wizard.
+
+Credit and thanks to:
+
+- **[OpenCode](https://opencode.ai)** by [SST](https://github.com/sst/opencode) — the AI coding agent that powers everything under the hood.
+- **[grinev/opencode-telegram-bot](https://github.com/grinev/opencode-telegram-bot)** by [Ruslan Grinev](https://github.com/grinev) — the upstream Telegram-to-OpenCode bridge whose Telegram/OpenCode integration, session management, and SSE event handling form the technical foundation this project was built on top of.
 - **[OpenClaw Skills ecosystem](https://github.com/topics/openclaw-skills)** — for the SKILL.md standard and the thousands of skills compatible with this format.
 - **[Speechify](https://api.speechify.ai)** — for the free TTS API.
 - **[Groq](https://console.groq.com)** — for the free Whisper STT API.

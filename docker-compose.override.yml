@@ -1,34 +1,10 @@
 # docker-compose.override.yml
 #
-# This file is loaded automatically by docker compose alongside docker-compose.yml.
+# Loaded automatically by `docker compose` alongside docker-compose.yml.
 # Use it to customize the setup for your environment without modifying the main file.
 #
-# FULL DOCKER MODE (recommended — VPS, servers, any environment):
-#   docker compose --profile full up -d
-#
-# BOT-ONLY MODE (trusted environments only — your personal PC):
-#   ⚠ WARNING: OpenCode runs on your host machine with access to your file system.
-#   Only use this if you trust the environment.
-#
-#   1. Make sure OpenCode is running as a system service. setup.sh installs it
-#      with the equivalent of:
-#         opencode serve --hostname 0.0.0.0 --port 4096
-#      The --hostname 0.0.0.0 is REQUIRED — OpenCode's default is 127.0.0.1,
-#      which is unreachable from inside the bot's Docker container.
-#
-#   2. Verify OpenCode is bound on all interfaces:
-#         ss -tlnp | grep 4096        # should show 0.0.0.0:4096, not 127.0.0.1:4096
-#
-#   3. If UFW is active, allow Docker bridge traffic to the OpenCode port:
-#         sudo ufw allow from 172.17.0.0/16 to any port 4096 proto tcp
-#
-#   4. Set OPENCODE_API_URL=http://host.docker.internal:4096 in .env.
-#      docker-compose.yml maps host.docker.internal to host-gateway automatically.
-#
-#   5. Start the bot only:
-#         docker compose up -d
-#
-# Customize this file for your specific needs:
+# Default install: `docker compose up -d` brings up both the bot and OpenCode.
+# Update flow:    `git pull && docker compose up -d --build`
 
 # Example: expose a port for debugging
 # services:

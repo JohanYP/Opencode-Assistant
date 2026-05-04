@@ -1,6 +1,6 @@
-# OpenCode Telegram Bot
+# Opencode-Assistant
 
-Telegram bot client for OpenCode that lets you run and monitor coding tasks on your local machine from Telegram.
+Personal AI assistant on Telegram, powered by OpenCode. Runs and monitors coding tasks, schedules cron jobs, manages MCP servers, and keeps persistent memory across sessions — all through Telegram.
 
 > Project concept and boundaries are documented in [`CONCEPT.md`](./CONCEPT.md).
 > Proposed changes that alter the core interaction model should be discussed before implementation.
@@ -162,12 +162,20 @@ Model picker behavior:
 - [x] `/mcps` command: browse available MCP servers
 - [x] Optional local OpenCode server monitoring with automatic restart
 
-## Current Task List
+## Roadmap
 
-Open tasks for upcoming iterations:
+The project is moving along a phased roadmap toward an OpenClaw-compatible personal assistant with OpenCode as the engine. Detailed plan in `/.claude/plans/validated-wobbling-mitten.md`. Summary:
 
-- [ ] `/messages` command: browse session messages with fork/revert actions
-- [ ] Model search in model switcher
-- [ ] Docker runtime support and deployment guide
-- [ ] Add a bot settings command with in-chat UI
-- [ ] Add project file browsing helpers (for example, `ls`-like flows with ability to send file to Telegram)
+- **Phase 0** — re-anchor docs (this document + `CONCEPT.md` + `README.md`).
+- **Phase 0.5** — drop the bot-only installation mode; Docker becomes the only supported install path.
+- **Phase 1** — replace markdown-file memory with **SQLite** as source of truth, expose memory/skills/context to OpenCode via a local **MCP server** so memory is live across sessions.
+- **Phase 2** — skills ecosystem polish: registry, integrity (sha256), `requires.env` validation, audit log.
+- **Phase 3** — onboarding polish: robust `setup.sh`, runtime error messages, troubleshooting docs.
+- **Phase 4** — distribution & visibility: detach fork, releases, Docker image publishing, presence in OpenClaw ecosystem.
+
+Older follow-ups still open and tracked separately:
+
+- [ ] `/messages` command: browse session messages with fork/revert actions.
+- [ ] Model search in the model switcher.
+- [ ] Bot settings command with in-chat UI.
+- [ ] Project file browsing helpers (e.g. `ls`-like flows with ability to send a file to Telegram).
