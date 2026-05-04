@@ -396,12 +396,11 @@ Available scripts:
 
 ## Acknowledgments
 
-Opencode-Assistant is an independent personal-assistant project. Historically it began as work on top of an open-source Telegram bot client for OpenCode and has since evolved into its own product with a persistent memory system, OpenClaw skills, cron jobs with continue/cancel deliveries, voice TTS/STT, and a guided setup wizard.
-
-Credit and thanks to:
+Opencode-Assistant is an independent personal-assistant project. Built on top of the open-source ecosystem:
 
 - **[OpenCode](https://opencode.ai)** by [SST](https://github.com/sst/opencode) — the AI coding agent that powers everything under the hood.
-- **[grinev/opencode-telegram-bot](https://github.com/grinev/opencode-telegram-bot)** by [Ruslan Grinev](https://github.com/grinev) — the upstream Telegram-to-OpenCode bridge whose Telegram/OpenCode integration, session management, and SSE event handling form the technical foundation this project was built on top of.
-- **[OpenClaw Skills ecosystem](https://github.com/topics/openclaw-skills)** — for the SKILL.md standard and the thousands of skills compatible with this format.
+- **[OpenClaw Skills ecosystem](https://github.com/topics/openclaw-skills)** — for the SKILL.md standard and the thousands of community skills compatible with it.
 - **[Speechify](https://api.speechify.ai)** — for the free TTS API.
 - **[Groq](https://console.groq.com)** — for the free Whisper STT API.
+
+Per the MIT license, prior copyright notices for the original code base are preserved in [`LICENSE`](./LICENSE).
