@@ -30,6 +30,7 @@ export const fr: I18nDictionary = {
   "cmd.description.memory_remove": "Supprimer un fait enregistré par id",
   "cmd.description.memory_export": "Exporter la mémoire en fichiers markdown",
   "cmd.description.memory_reembed": "Recalculer les embeddings de la mémoire vectorielle",
+  "cmd.description.inline_facts": "Nombre de faits récents injectés au démarrage de session",
   "cmd.description.help": "Aide",
 
   "callback.unknown_command": "Commande inconnue",
@@ -162,6 +163,21 @@ export const fr: I18nDictionary = {
   "memory.reembed.complete":
     "✅ Recalcul terminé. Traités : {processed}, échoués : {failed}, modèle : {model}.",
   "memory.reembed.failed": "Échec du recalcul de la mémoire. Voir les logs pour plus de détails.",
+
+  "inline_facts.current":
+    "Faits récents injectés : {current} ({override}, défaut env {env_default}).",
+  "inline_facts.override_user": "override utilisateur",
+  "inline_facts.override_env": "défaut env",
+  "inline_facts.usage":
+    "Usage :\n  /inline_facts on              — utiliser le défaut env\n  /inline_facts off             — désactiver, forcer fact_search via MCP\n  /inline_facts <0-100>         — fixer une limite spécifique",
+  "inline_facts.invalid_value":
+    "Valeur invalide. Utilisez /inline_facts on, off ou un nombre entre 0 et 100.",
+  "inline_facts.now_off":
+    "✅ Injection de faits DÉSACTIVÉE. L'assistant doit appeler fact_search à chaque requête mémoire.",
+  "inline_facts.now_default":
+    "✅ Injection de faits revenue au défaut env ({env_default}).",
+  "inline_facts.now_set": "✅ Injection de faits fixée à {value}.",
+  "inline_facts.error": "Impossible de mettre à jour le paramètre d'injection.",
 
   "projects.empty":
     "📭 Aucun projet trouvé.\n\nOuvrez un répertoire dans OpenCode et créez au moins une session, il apparaîtra ensuite ici.",

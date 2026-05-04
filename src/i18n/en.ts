@@ -27,6 +27,7 @@ export const en = {
   "cmd.description.memory_remove": "Delete a saved fact by id",
   "cmd.description.memory_export": "Export memory to markdown files",
   "cmd.description.memory_reembed": "Recompute embeddings for vector memory",
+  "cmd.description.inline_facts": "Set how many recent facts to inline at session start",
   "cmd.description.help": "Help",
 
   "callback.unknown_command": "Unknown command",
@@ -153,6 +154,21 @@ export const en = {
   "memory.reembed.complete":
     "✅ Re-embedding done. Processed: {processed}, failed: {failed}, model: {model}.",
   "memory.reembed.failed": "Failed to re-embed memories. See logs for details.",
+
+  "inline_facts.current":
+    "Inline recent facts: {current} ({override}, env default {env_default}).",
+  "inline_facts.override_user": "user override",
+  "inline_facts.override_env": "env default",
+  "inline_facts.usage":
+    "Usage:\n  /inline_facts on              — use the env default\n  /inline_facts off             — disable, force fact_search via MCP\n  /inline_facts <0-100>         — set a specific limit",
+  "inline_facts.invalid_value":
+    "Invalid value. Use /inline_facts on, off, or a number between 0 and 100.",
+  "inline_facts.now_off":
+    "✅ Inline facts DISABLED. The assistant must call fact_search for every memory query.",
+  "inline_facts.now_default":
+    "✅ Inline facts back to the env default ({env_default}).",
+  "inline_facts.now_set": "✅ Inline facts set to {value}.",
+  "inline_facts.error": "Failed to update inline facts setting.",
 
   "projects.empty":
     "📭 No projects found.\n\nOpen a directory in OpenCode and create at least one session, then it will appear here.",

@@ -30,6 +30,7 @@ export const es: I18nDictionary = {
   "cmd.description.memory_remove": "Eliminar un dato guardado por id",
   "cmd.description.memory_export": "Exportar memoria a archivos markdown",
   "cmd.description.memory_reembed": "Recalcular embeddings de la memoria vectorial",
+  "cmd.description.inline_facts": "Cuántos datos recientes se inyectan al iniciar sesión",
   "cmd.description.help": "Ayuda",
 
   "callback.unknown_command": "Comando desconocido",
@@ -161,6 +162,21 @@ export const es: I18nDictionary = {
   "memory.reembed.complete":
     "✅ Re-embebido completo. Procesados: {processed}, fallidos: {failed}, modelo: {model}.",
   "memory.reembed.failed": "Fallo al re-embeber la memoria. Revisa los logs para más detalles.",
+
+  "inline_facts.current":
+    "Datos recientes inyectados: {current} ({override}, default del entorno {env_default}).",
+  "inline_facts.override_user": "override del usuario",
+  "inline_facts.override_env": "default del entorno",
+  "inline_facts.usage":
+    "Uso:\n  /inline_facts on              — usar el default del entorno\n  /inline_facts off             — apagar, forzar fact_search vía MCP\n  /inline_facts <0-100>         — fijar un límite específico",
+  "inline_facts.invalid_value":
+    "Valor inválido. Usa /inline_facts on, off o un número entre 0 y 100.",
+  "inline_facts.now_off":
+    "✅ Inyección de datos APAGADA. El asistente debe llamar fact_search en cada consulta.",
+  "inline_facts.now_default":
+    "✅ Inyección de datos vuelve al default del entorno ({env_default}).",
+  "inline_facts.now_set": "✅ Inyección de datos fijada en {value}.",
+  "inline_facts.error": "No se pudo actualizar la configuración de inyección.",
 
   "projects.empty":
     "📭 No se encontraron proyectos.\n\nAbre un directorio en OpenCode y crea al menos una sesión; entonces aparecerá aquí.",

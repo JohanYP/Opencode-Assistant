@@ -68,6 +68,7 @@ export interface AppConfig {
   memory: {
     dir: string;
     injectEnabled: boolean;
+    inlineRecentFacts: number;
   };
   mcp: {
     httpEnabled: boolean;
@@ -273,6 +274,17 @@ export function loadConfig(): AppConfig {
     memory: {
       dir: getEnvVar("MEMORY_DIR", false) || "./memory",
       injectEnabled: getOptionalBooleanEnvVar("MEMORY_INJECT_ENABLED", true),
+      // How many of the most recent facts to inline into a fresh session's
+      // system prompt. 0 disables the inline path entirely so the model is
+      // forced to call fact_search (useful for testing vector recall).
+      // Overridable per-instance via the /inline_facts command.
+      inlineRecentFacts: (() => {
+        const raw = getEnvVar("MEMORY_INLINE_RECENT_FACTS", false);
+        if (!raw) return 20;
+        const n = Number.parseInt(raw, 10);
+        if (Number.isNaN(n) || n < 0) return 20;
+        return Math.min(n, 100);
+      })(),
     },
     mcp: {
       // The bot exposes its memory MCP server over HTTP on this host:port so

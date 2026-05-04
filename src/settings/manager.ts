@@ -35,6 +35,18 @@ export interface UiPreferences {
    * users who never set it.
    */
   showToolMessages?: boolean;
+
+  /**
+   * Per-instance override for how many recent facts get inlined into the
+   * session-start system prompt. When set, replaces the value coming from
+   * config.memory.inlineRecentFacts (which itself comes from
+   * MEMORY_INLINE_RECENT_FACTS env var, default 20).
+   *
+   * Setting it to 0 disables the inline path entirely — the assistant
+   * must call fact_search via MCP for any context retrieval, useful when
+   * testing vector recall. `null`/undefined means "use the config default".
+   */
+  inlineRecentFacts?: number | null;
 }
 
 export interface Settings {
@@ -197,6 +209,8 @@ export function setScheduledTasks(tasks: ScheduledTask[]): Promise<void> {
 
 const DEFAULT_UI_PREFERENCES: Required<UiPreferences> = {
   showToolMessages: true,
+  // null means "no override; let config.memory.inlineRecentFacts decide".
+  inlineRecentFacts: null,
 };
 
 export function getUiPreferences(): Required<UiPreferences> {

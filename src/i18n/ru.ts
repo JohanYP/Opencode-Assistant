@@ -30,6 +30,7 @@ export const ru: I18nDictionary = {
   "cmd.description.memory_remove": "Удалить сохранённый факт по id",
   "cmd.description.memory_export": "Экспортировать память в markdown-файлы",
   "cmd.description.memory_reembed": "Пересчитать эмбеддинги векторной памяти",
+  "cmd.description.inline_facts": "Сколько недавних фактов вставлять при старте сессии",
   "cmd.description.help": "Справка",
 
   "callback.unknown_command": "Неизвестная команда",
@@ -155,6 +156,21 @@ export const ru: I18nDictionary = {
     "✅ Пересчёт завершён. Обработано: {processed}, не удалось: {failed}, модель: {model}.",
   "memory.reembed.failed":
     "Не удалось пересчитать память. Подробности в логах.",
+
+  "inline_facts.current":
+    "Встраиваемых недавних фактов: {current} ({override}, env-по-умолчанию {env_default}).",
+  "inline_facts.override_user": "пользовательский override",
+  "inline_facts.override_env": "env-по-умолчанию",
+  "inline_facts.usage":
+    "Использование:\n  /inline_facts on              — использовать env-default\n  /inline_facts off             — выключить, принудительно fact_search через MCP\n  /inline_facts <0-100>         — задать конкретное значение",
+  "inline_facts.invalid_value":
+    "Недопустимое значение. Используйте /inline_facts on, off или число от 0 до 100.",
+  "inline_facts.now_off":
+    "✅ Встраивание фактов ВЫКЛЮЧЕНО. Ассистент будет вызывать fact_search при каждом запросе.",
+  "inline_facts.now_default":
+    "✅ Встраивание фактов вернулось к env-default ({env_default}).",
+  "inline_facts.now_set": "✅ Встраивание фактов установлено в {value}.",
+  "inline_facts.error": "Не удалось обновить настройку встраивания.",
 
   "projects.empty":
     "📭 Проектов нет.\n\nОткройте директорию в OpenCode и создайте хотя бы одну сессию, после этого она появится здесь.",

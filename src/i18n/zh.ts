@@ -30,6 +30,7 @@ export const zh: I18nDictionary = {
   "cmd.description.memory_remove": "按 id 删除已保存的事实",
   "cmd.description.memory_export": "将记忆导出为 markdown 文件",
   "cmd.description.memory_reembed": "重新计算向量记忆的嵌入向量",
+  "cmd.description.inline_facts": "会话开始时内联多少条最近事实",
   "cmd.description.help": "帮助",
 
   "callback.unknown_command": "未知命令",
@@ -141,6 +142,18 @@ export const zh: I18nDictionary = {
   "memory.reembed.complete":
     "✅ 重新嵌入完成。已处理：{processed}，失败：{failed}，模型：{model}。",
   "memory.reembed.failed": "重新嵌入失败。详情请查看日志。",
+
+  "inline_facts.current":
+    "内联最近事实数：{current}（{override}，环境默认 {env_default}）。",
+  "inline_facts.override_user": "用户覆盖",
+  "inline_facts.override_env": "环境默认",
+  "inline_facts.usage":
+    "用法：\n  /inline_facts on              — 使用环境默认\n  /inline_facts off             — 关闭，强制通过 MCP 调用 fact_search\n  /inline_facts <0-100>         — 设置具体上限",
+  "inline_facts.invalid_value": "无效值。使用 /inline_facts on、off 或 0 到 100 之间的数字。",
+  "inline_facts.now_off": "✅ 内联事实已关闭。助手必须在每次记忆查询时调用 fact_search。",
+  "inline_facts.now_default": "✅ 内联事实恢复到环境默认（{env_default}）。",
+  "inline_facts.now_set": "✅ 内联事实设为 {value}。",
+  "inline_facts.error": "无法更新内联事实设置。",
 
   "projects.empty":
     "📭 未找到项目。\n\n在 OpenCode 中打开一个目录并至少创建一个会话，然后它会出现在这里。",

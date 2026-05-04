@@ -121,8 +121,12 @@ export function searchFacts(query: string, options: SearchFactsOptions = {}): Fa
 
 export function getRecentFacts(limit = 20): Fact[] {
   const db = getDb();
+  // id DESC tiebreaker: when many facts get inserted within the same
+  // millisecond (or come from a markdown import that uses one timestamp),
+  // we still want the latest insertion to come first instead of relying
+  // on SQLite's undefined order.
   return db
-    .prepare(`SELECT ${SELECT_COLUMNS} FROM facts ORDER BY updated_at DESC LIMIT ?`)
+    .prepare(`SELECT ${SELECT_COLUMNS} FROM facts ORDER BY updated_at DESC, id DESC LIMIT ?`)
     .all(limit) as Fact[];
 }
 

@@ -30,6 +30,7 @@ export const de: I18nDictionary = {
   "cmd.description.memory_remove": "Einen gespeicherten Fakt nach ID löschen",
   "cmd.description.memory_export": "Speicher in Markdown-Dateien exportieren",
   "cmd.description.memory_reembed": "Embeddings für Vektor-Speicher neu berechnen",
+  "cmd.description.inline_facts": "Wie viele jüngste Fakten beim Sitzungsstart eingefügt werden",
   "cmd.description.help": "Hilfe",
 
   "callback.unknown_command": "Unbekannter Befehl",
@@ -162,6 +163,21 @@ export const de: I18nDictionary = {
     "✅ Re-Embedding fertig. Verarbeitet: {processed}, fehlgeschlagen: {failed}, Modell: {model}.",
   "memory.reembed.failed":
     "Fehler beim Re-Embedding. Details siehe Logs.",
+
+  "inline_facts.current":
+    "Inline-Fakten: {current} ({override}, Umgebungs-Default {env_default}).",
+  "inline_facts.override_user": "Nutzer-Override",
+  "inline_facts.override_env": "Umgebungs-Default",
+  "inline_facts.usage":
+    "Verwendung:\n  /inline_facts on              — Umgebungs-Default verwenden\n  /inline_facts off             — deaktivieren, fact_search via MCP erzwingen\n  /inline_facts <0-100>         — bestimmten Wert setzen",
+  "inline_facts.invalid_value":
+    "Ungültiger Wert. Verwende /inline_facts on, off oder eine Zahl zwischen 0 und 100.",
+  "inline_facts.now_off":
+    "✅ Inline-Fakten DEAKTIVIERT. Der Assistent muss bei jeder Speicher-Abfrage fact_search aufrufen.",
+  "inline_facts.now_default":
+    "✅ Inline-Fakten zurück auf Umgebungs-Default ({env_default}).",
+  "inline_facts.now_set": "✅ Inline-Fakten auf {value} gesetzt.",
+  "inline_facts.error": "Inline-Fakten-Einstellung konnte nicht aktualisiert werden.",
 
   "projects.empty":
     "📭 Keine Projekte gefunden.\n\nÖffne ein Verzeichnis in OpenCode und erstelle mindestens eine Sitzung, dann erscheint es hier.",

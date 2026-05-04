@@ -1,3 +1,5 @@
+import { config } from "../config.js";
+import { getUiPreferences } from "../settings/manager.js";
 import { logger } from "../utils/logger.js";
 import { getDocument } from "./repositories/documents.js";
 import { getRecentFacts } from "./repositories/facts.js";
@@ -7,12 +9,21 @@ import {
   markSessionInitialized,
 } from "./session-tracker.js";
 
-// Cap how many recent facts get inlined into a fresh session's system
-// prompt. 20 covers the common case (user preferences, current projects,
-// recent reminders) while staying under ~2 KB of prompt overhead.
-const INLINE_RECENT_FACTS_LIMIT = 20;
-
 const MEMORY_INJECT_ENABLED = process.env.MEMORY_INJECT_ENABLED !== "false";
+
+/**
+ * Resolve how many recent facts to inline. The /inline_facts command
+ * persists an override in settings; otherwise we fall back to the
+ * MEMORY_INLINE_RECENT_FACTS env var (default 20). 0 disables the inline
+ * path entirely so the model is forced to call fact_search via MCP.
+ */
+function getInlineRecentFactsLimit(): number {
+  const override = getUiPreferences().inlineRecentFacts;
+  if (typeof override === "number" && override >= 0) {
+    return override;
+  }
+  return config.memory.inlineRecentFacts;
+}
 
 /**
  * Builds the FULL context block for the first message of a new session.
@@ -68,21 +79,27 @@ async function buildFirstMessageContext(): Promise<string> {
   // Models are unreliable about proactive tool use; injecting the recent
   // tail makes preferences/reminders/project notes visible by default,
   // and the MCP tools remain available for deeper queries.
-  const recentFacts = getRecentFacts(INLINE_RECENT_FACTS_LIMIT);
-  if (recentFacts.length > 0) {
-    const factLines = recentFacts
-      .map((f) => {
-        const tag = f.category ? `[${f.category}] ` : "";
-        return `- (#${f.id}) ${tag}${f.content}`;
-      })
-      .join("\n");
-    parts.push(
-      `<known_facts_about_user>\n` +
-        `These are the ${recentFacts.length} most recently saved facts. ` +
-        `Trust them as already-known context. Use fact_search() for older / more specific queries.\n` +
-        factLines +
-        `\n</known_facts_about_user>`,
-    );
+  //
+  // limit=0 disables the inline path so the model is forced into
+  // fact_search every time — useful for testing vector recall.
+  const limit = getInlineRecentFactsLimit();
+  if (limit > 0) {
+    const recentFacts = getRecentFacts(limit);
+    if (recentFacts.length > 0) {
+      const factLines = recentFacts
+        .map((f) => {
+          const tag = f.category ? `[${f.category}] ` : "";
+          return `- (#${f.id}) ${tag}${f.content}`;
+        })
+        .join("\n");
+      parts.push(
+        `<known_facts_about_user>\n` +
+          `These are the ${recentFacts.length} most recently saved facts. ` +
+          `Trust them as already-known context. Use fact_search() for older / more specific queries.\n` +
+          factLines +
+          `\n</known_facts_about_user>`,
+      );
+    }
   }
 
   const summary = getDocument("session-summary");

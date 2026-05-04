@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Bot, Context } from "grammy";
+import { config } from "../../config.js";
 import { logger } from "../../utils/logger.js";
 import {
   getDocument,
@@ -192,6 +193,63 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
     } catch (error) {
       logger.error("[MemoryCommands] /show_tools error:", error);
       await ctx.reply(t("show_tools.error"));
+    }
+  });
+
+  // /inline_facts <on|off|N> — control how many recent facts get inlined
+  // at session start. Sending "off" or "0" forces the model to call
+  // fact_search via MCP for every memory query (useful for testing
+  // vector recall). "on" restores the env-var default. A bare number
+  // sets that value as the override.
+  bot.command("inline_facts", async (ctx) => {
+    try {
+      const arg = ctx.match?.trim().toLowerCase();
+      const override = getUiPreferences().inlineRecentFacts;
+      const envDefault = config.memory.inlineRecentFacts;
+      const effective = typeof override === "number" && override >= 0 ? override : envDefault;
+
+      if (!arg) {
+        await ctx.reply(
+          t("inline_facts.current", {
+            current: String(effective),
+            override:
+              typeof override === "number"
+                ? t("inline_facts.override_user")
+                : t("inline_facts.override_env"),
+            env_default: String(envDefault),
+          }) +
+            "\n\n" +
+            t("inline_facts.usage"),
+        );
+        return;
+      }
+
+      let next: number | null;
+      if (arg === "off" || arg === "false" || arg === "no" || arg === "0") {
+        next = 0;
+      } else if (arg === "on" || arg === "true" || arg === "yes" || arg === "default") {
+        next = null;
+      } else {
+        const parsed = Number.parseInt(arg, 10);
+        if (Number.isNaN(parsed) || parsed < 0 || parsed > 100) {
+          await ctx.reply(t("inline_facts.invalid_value"));
+          return;
+        }
+        next = parsed;
+      }
+
+      await setUiPreferences({ inlineRecentFacts: next });
+
+      if (next === 0) {
+        await ctx.reply(t("inline_facts.now_off"));
+      } else if (next === null) {
+        await ctx.reply(t("inline_facts.now_default", { env_default: String(envDefault) }));
+      } else {
+        await ctx.reply(t("inline_facts.now_set", { value: String(next) }));
+      }
+    } catch (error) {
+      logger.error("[MemoryCommands] /inline_facts error:", error);
+      await ctx.reply(t("inline_facts.error"));
     }
   });
 
