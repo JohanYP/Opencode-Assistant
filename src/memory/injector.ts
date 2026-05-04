@@ -1,5 +1,6 @@
 import { logger } from "../utils/logger.js";
-import { listSkills, readMemoryFile, readSessionSummary } from "./manager.js";
+import { getDocument } from "./repositories/documents.js";
+import { listSkills } from "./repositories/skills.js";
 import {
   isSessionInitialized,
   markSessionInitialized,
@@ -9,35 +10,47 @@ const MEMORY_INJECT_ENABLED = process.env.MEMORY_INJECT_ENABLED !== "false";
 
 /**
  * Builds the FULL context block for the first message of a new session.
- * Includes: soul.md + agents.md + skills list + session summary.
+ * Includes: soul + agents + skills list + session summary.
  *
- * memory.md and context.md are intentionally excluded from inline injection —
- * the directives below tell the assistant to read them via OpenCode tools
- * when relevant. The session summary captures the most important
- * cross-session state.
+ * Source of truth is the SQLite memory database. The legacy markdown files
+ * are imported into SQLite once at app startup (see migrate-from-files.ts);
+ * after that, the markdown files are no longer read by this code path.
+ *
+ * memory.md (now the `facts` table) and the documents table's `context`
+ * entry are intentionally not inlined — the directives below tell the
+ * assistant to fetch them via tools when relevant. The session summary is
+ * kept inline because it captures cross-session continuity that the model
+ * benefits from seeing up front.
  */
 async function buildFirstMessageContext(): Promise<string> {
   const parts: string[] = [];
 
-  const soul = await readMemoryFile("soul");
-  if (soul.trim()) {
-    parts.push(`<soul>\n${soul.trim()}\n</soul>`);
+  const soul = getDocument("soul");
+  if (soul && soul.content.trim()) {
+    parts.push(`<soul>\n${soul.content.trim()}\n</soul>`);
   }
 
-  const agents = await readMemoryFile("agents");
-  if (agents.trim()) {
-    parts.push(`<agents>\n${agents.trim()}\n</agents>`);
+  const agents = getDocument("agents");
+  if (agents && agents.content.trim()) {
+    parts.push(`<agents>\n${agents.content.trim()}\n</agents>`);
   }
 
-  const skillNames = await listSkills();
-  if (skillNames.length > 0) {
-    const skillLines = skillNames.map((s) => `- ${s}`).join("\n");
+  const skills = listSkills();
+  if (skills.length > 0) {
+    const skillLines = skills
+      .map((s) => {
+        if (s.description) return `- ${s.name} — ${s.description}`;
+        return `- ${s.name}`;
+      })
+      .join("\n");
     parts.push(`<skills_available>\n${skillLines}\n</skills_available>`);
   }
 
-  const summary = await readSessionSummary();
-  if (summary.trim()) {
-    parts.push(`<previous_session_summary>\n${summary.trim()}\n</previous_session_summary>`);
+  const summary = getDocument("session-summary");
+  if (summary && summary.content.trim()) {
+    parts.push(
+      `<previous_session_summary>\n${summary.content.trim()}\n</previous_session_summary>`,
+    );
   }
 
   if (parts.length === 0) {
@@ -62,10 +75,10 @@ async function buildFirstMessageContext(): Promise<string> {
     "   ASSUME it as already-known context. Do not ask the user to repeat anything",
     "   already covered there.",
     "",
-    "5. memory.md (long-term facts about the user) and context.md (current project",
-    "   context) are NOT inlined below. READ them with the read tool whenever the user's",
-    "   request would benefit from that context. Do not ignore them just because they",
-    "   are not visible in this prompt.",
+    "5. The assistant's long-term memory facts and current project context are",
+    "   maintained in a SQLite database, not inlined here. When the OpenCode runtime",
+    "   provides MCP memory tools (memory_read, fact_search, fact_recent, skill_read,",
+    "   etc.), use them to fetch additional context as needed instead of asking the user.",
     "",
     "6. After applying the directives above, respond to the user message that appears",
     "   after the END SESSION CONTEXT marker. Do not reference, quote, or repeat these",
@@ -136,6 +149,6 @@ export async function buildMemoryContext(): Promise<string> {
  * Reads a specific skill's content for inline display.
  */
 export async function getSkillContent(skillName: string): Promise<string> {
-  const { readSkill } = await import("./manager.js");
-  return readSkill(skillName);
+  const { getSkill } = await import("./repositories/skills.js");
+  return getSkill(skillName)?.content ?? "";
 }

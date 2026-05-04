@@ -38,11 +38,13 @@ const COMMAND_DEFINITIONS: BotCommandI18nDefinition[] = [
   { command: "open", descriptionKey: "cmd.description.open" },
   { command: "soul", descriptionKey: "cmd.description.soul" },
   { command: "memory", descriptionKey: "cmd.description.memory" },
+  { command: "memory_search", descriptionKey: "cmd.description.memory_search" },
   { command: "context", descriptionKey: "cmd.description.context" },
   { command: "memfiles", descriptionKey: "cmd.description.memfiles" },
   { command: "listskill", descriptionKey: "cmd.description.listskill" },
   { command: "skill", descriptionKey: "cmd.description.skill" },
   { command: "skill_install", descriptionKey: "cmd.description.skill_install" },
+  { command: "skill_remove", descriptionKey: "cmd.description.skill_remove" },
   { command: "help", descriptionKey: "cmd.description.help" },
 ];
 

@@ -36,6 +36,13 @@ settings.json
 
 # Memory backups (runtime generated)
 memory/backups/*/
+memory/.pre-sqlite-backup/
+memory/export-*/
+
+# SQLite memory database (per-instance state)
+memory/data.db
+memory/data.db-shm
+memory/data.db-wal
 
 # Keep memory structure but not personal data
 # (uncomment the lines below if you want to exclude personal memory files)

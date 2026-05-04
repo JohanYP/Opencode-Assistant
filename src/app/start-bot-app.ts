@@ -11,6 +11,8 @@ import { startCronYmlSync, stopCronYmlSync } from "../cron/yml-sync.js";
 import { warmupSessionDirectoryCache } from "../session/cache-manager.js";
 import { reconcileStoredModelSelection } from "../model/manager.js";
 import { startMemorySummaryWatcher, stopMemorySummaryWatcher } from "../memory/watcher.js";
+import { migrateFromFiles } from "../memory/migrate-from-files.js";
+import { closeDb } from "../memory/db.js";
 import { getRuntimeMode } from "../runtime/mode.js";
 import { getRuntimePaths } from "../runtime/paths.js";
 import { clearServiceStateFile } from "../service/manager.js";
@@ -52,6 +54,22 @@ export async function startBotApp(): Promise<void> {
   await reconcileStoredModelSelection();
   await opencodeAutoRestartService.start();
   await warmupSessionDirectoryCache();
+
+  // Migrate legacy markdown memory into SQLite on first run. Idempotent —
+  // becomes a no-op once the DB has any rows. Backups of the original .md
+  // files are kept under memory/.pre-sqlite-backup/.
+  try {
+    const migration = await migrateFromFiles();
+    if (!migration.alreadyMigrated && migration.backupPath) {
+      logger.info(
+        `[App] Memory migrated to SQLite: ${migration.importedDocuments} doc(s), ` +
+          `${migration.importedFacts} fact(s), ${migration.importedSkills} skill(s), ` +
+          `${migration.importedScheduledTasks} scheduled task(s). Backup at ${migration.backupPath}.`,
+      );
+    }
+  } catch (error) {
+    logger.error("[App] Memory migration failed; continuing with markdown sources:", error);
+  }
 
   // Start watching session-summary.md so that when the LLM updates it
   // mid-session the next new session will receive the updated summary.
@@ -103,6 +121,7 @@ export async function startBotApp(): Promise<void> {
     scheduledTaskRuntime.shutdown();
     stopCronYmlSync();
     stopMemorySummaryWatcher();
+    closeDb();
 
     shutdownTimeout = setTimeout(() => {
       logger.warn(`[App] Shutdown did not finish in ${SHUTDOWN_TIMEOUT_MS}ms, forcing exit.`);

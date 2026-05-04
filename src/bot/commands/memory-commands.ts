@@ -1,16 +1,32 @@
 import https from "node:https";
 import http from "node:http";
+import fs from "node:fs/promises";
+import path from "node:path";
 import type { Bot, Context } from "grammy";
-import {
-  listSkillsWithMeta,
-  parseSkillFrontmatter,
-  readMemoryFile,
-  readSkill,
-  writeMemoryFile,
-  writeSkill,
-  type WritableMemoryFile,
-} from "../../memory/manager.js";
 import { logger } from "../../utils/logger.js";
+import { parseSkillFrontmatter } from "../../memory/manager.js";
+import {
+  getDocument,
+  listDocuments,
+  setDocument,
+  type DocumentName,
+} from "../../memory/repositories/documents.js";
+import {
+  addFact,
+  countFacts,
+  deleteFact,
+  getFactById,
+  getRecentFacts,
+  searchFacts,
+} from "../../memory/repositories/facts.js";
+import {
+  getSkill,
+  installSkill,
+  listSkills,
+  removeSkill,
+  verifySkillIntegrity,
+} from "../../memory/repositories/skills.js";
+import { appendAudit } from "../../memory/repositories/audit.js";
 
 function downloadUrl(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -50,12 +66,13 @@ function truncate(text: string): string {
   return `${text.slice(0, MAX_TELEGRAM_MESSAGE)}\n\n...(truncated)`;
 }
 
-async function sendMemoryFile(
+async function sendDocument(
   ctx: Context,
-  name: Parameters<typeof readMemoryFile>[0],
+  name: DocumentName,
   label: string,
 ): Promise<void> {
-  const content = await readMemoryFile(name);
+  const doc = getDocument(name);
+  const content = doc?.content ?? "";
   if (!content.trim()) {
     await ctx.reply(`${label} is empty.`);
     return;
@@ -63,114 +80,200 @@ async function sendMemoryFile(
   await ctx.reply(`${label}\n\n${truncate(content)}`);
 }
 
+function formatFactLine(fact: {
+  id: number;
+  category: string | null;
+  content: string;
+}): string {
+  const categoryTag = fact.category ? `[${fact.category}] ` : "";
+  return `#${fact.id} ${categoryTag}${fact.content}`;
+}
+
 /**
- * Registers /soul, /memory, /context, /memfiles, /listskill, /skill, /skill_install.
+ * Registers the memory/skill bot commands. All reads and writes go through
+ * the SQLite-backed repositories — the legacy markdown files are imported
+ * once at startup and then live as the on-disk export at memory/.pre-sqlite-backup/.
  */
 export function registerMemoryCommands(bot: Bot<Context>): void {
-  // /soul — view soul.md (read-only)
+  // /soul — view soul document (read-only)
   bot.command("soul", async (ctx) => {
     try {
-      await sendMemoryFile(ctx, "soul", "Soul");
+      await sendDocument(ctx, "soul", "Soul");
     } catch (error) {
       logger.error("[MemoryCommands] /soul error:", error);
-      await ctx.reply("Failed to read soul.md");
+      await ctx.reply("Failed to read soul document.");
     }
   });
 
-  // /memory [content] — view or append to memory.md
-  bot.command("memory", async (ctx) => {
+  // /agents_md — view agents document (read-only)
+  bot.command("agents_md", async (ctx) => {
     try {
-      const arg = ctx.match?.trim();
-      if (arg) {
-        await writeMemoryFile("memory", (await readMemoryFile("memory")) + `\n\n${arg}`);
-        await ctx.reply("memory.md updated.");
-        return;
-      }
-      await sendMemoryFile(ctx, "memory", "Memory");
+      await sendDocument(ctx, "agents", "Agents");
     } catch (error) {
-      logger.error("[MemoryCommands] /memory error:", error);
-      await ctx.reply("Failed to access memory.md");
+      logger.error("[MemoryCommands] /agents_md error:", error);
+      await ctx.reply("Failed to read agents document.");
     }
   });
 
-  // /context [content] — view or replace context.md
+  // /context [text] — view or replace the project-context document.
   bot.command("context", async (ctx) => {
     try {
       const arg = ctx.match?.trim();
       if (arg) {
-        await writeMemoryFile("context", arg);
-        await ctx.reply("context.md updated.");
+        setDocument("context", arg);
+        appendAudit("document_updated", { name: "context", source: "telegram" });
+        await ctx.reply("Context updated.");
         return;
       }
-      await sendMemoryFile(ctx, "context", "Context");
+      await sendDocument(ctx, "context", "Context");
     } catch (error) {
       logger.error("[MemoryCommands] /context error:", error);
-      await ctx.reply("Failed to access context.md");
+      await ctx.reply("Failed to access context.");
     }
   });
 
-  // /agents_md — view agents.md
-  bot.command("agents_md", async (ctx) => {
+  // /memory [text] — list recent facts, or save a new atomic fact.
+  bot.command("memory", async (ctx) => {
     try {
-      await sendMemoryFile(ctx, "agents", "Agents");
-    } catch (error) {
-      logger.error("[MemoryCommands] /agents_md error:", error);
-      await ctx.reply("Failed to read agents.md");
-    }
-  });
-
-  // /memfiles — list all memory files with sizes
-  bot.command("memfiles", async (ctx) => {
-    try {
-      const files: Array<{ name: WritableMemoryFile | "soul"; label: string }> = [
-        { name: "soul", label: "soul.md (read-only)" },
-        { name: "memory", label: "memory.md" },
-        { name: "context", label: "context.md" },
-        { name: "agents", label: "agents.md" },
-      ];
-
-      const lines: string[] = ["Memory Files\n"];
-      for (const { name, label } of files) {
-        const content = await readMemoryFile(name);
-        const size = content.length;
-        const preview = content.trim() ? "✓" : "empty";
-        lines.push(`• ${label} — ${size} chars ${preview}`);
+      const arg = ctx.match?.trim();
+      if (arg) {
+        const fact = addFact({ content: arg, source: "telegram" });
+        appendAudit("fact_added", { id: fact.id, source: "telegram" });
+        await ctx.reply(`Saved fact #${fact.id}: ${fact.content}`);
+        return;
       }
 
-      const skills = await listSkillsWithMeta();
-      if (skills.length > 0) {
-        lines.push(`\nSkills (${skills.length})`);
-        for (const skill of skills) {
-          const info = skill.description
-            ? `${skill.name} — ${skill.description.slice(0, 60)}${skill.description.length > 60 ? "..." : ""}`
-            : skill.name;
-          lines.push(`• ${info}`);
-        }
-      } else {
-        lines.push("\nNo skills found in memory/skills/");
-      }
-
-      lines.push("\nUse /listskill for details • /skill <name> to view one");
-      await ctx.reply(lines.join("\n"));
-    } catch (error) {
-      logger.error("[MemoryCommands] /memfiles error:", error);
-      await ctx.reply("Failed to list memory files");
-    }
-  });
-
-  // /listskill — list skills available in memory/skills/ with OpenClaw metadata when present
-  bot.command("listskill", async (ctx) => {
-    try {
-      const skills = await listSkillsWithMeta();
-      if (skills.length === 0) {
+      const recent = getRecentFacts(20);
+      if (recent.length === 0) {
         await ctx.reply(
-          "No skills found in memory/skills/\n" +
-            "Drop .md files into that folder to add skills.",
+          "No facts saved yet.\n" +
+            "Use /memory <text> to save one, or /memory_search <query> to search.",
         );
         return;
       }
 
-      const lines = [`Available Skills (${skills.length})\n`];
+      const lines = [`Recent memory (${recent.length} of ${countFacts()} fact(s)):\n`];
+      for (const f of recent) {
+        lines.push(formatFactLine(f));
+      }
+      lines.push("\n/memory <text> to save • /memory_search <query> to filter");
+      await ctx.reply(truncate(lines.join("\n")));
+    } catch (error) {
+      logger.error("[MemoryCommands] /memory error:", error);
+      await ctx.reply("Failed to access memory.");
+    }
+  });
+
+  // /memory_search <query> — substring search over saved facts.
+  bot.command("memory_search", async (ctx) => {
+    try {
+      const query = ctx.match?.trim();
+      if (!query) {
+        await ctx.reply("Usage: /memory_search <query>");
+        return;
+      }
+      const results = searchFacts(query, { limit: 30 });
+      if (results.length === 0) {
+        await ctx.reply(`No facts match "${query}".`);
+        return;
+      }
+      const lines = [`Matches for "${query}" (${results.length}):\n`];
+      for (const f of results) {
+        lines.push(formatFactLine(f));
+      }
+      await ctx.reply(truncate(lines.join("\n")));
+    } catch (error) {
+      logger.error("[MemoryCommands] /memory_search error:", error);
+      await ctx.reply("Failed to search memory.");
+    }
+  });
+
+  // /memory_remove <id> — delete a fact by id.
+  bot.command("memory_remove", async (ctx) => {
+    try {
+      const raw = ctx.match?.trim();
+      if (!raw) {
+        await ctx.reply("Usage: /memory_remove <id>");
+        return;
+      }
+      const id = Number.parseInt(raw, 10);
+      if (Number.isNaN(id) || id <= 0) {
+        await ctx.reply("Invalid id. Use /memory to list facts with their ids.");
+        return;
+      }
+      const fact = getFactById(id);
+      if (!fact) {
+        await ctx.reply(`Fact #${id} not found.`);
+        return;
+      }
+      const ok = deleteFact(id);
+      if (ok) {
+        appendAudit("fact_deleted", { id, content: fact.content });
+        await ctx.reply(`Deleted fact #${id}: ${fact.content}`);
+      } else {
+        await ctx.reply(`Failed to delete fact #${id}.`);
+      }
+    } catch (error) {
+      logger.error("[MemoryCommands] /memory_remove error:", error);
+      await ctx.reply("Failed to delete fact.");
+    }
+  });
+
+  // /memfiles — overview of memory state.
+  bot.command("memfiles", async (ctx) => {
+    try {
+      const docs = listDocuments();
+      const docByName = new Map(docs.map((d) => [d.name, d]));
+
+      const docOrder: DocumentName[] = ["soul", "agents", "context", "session-summary"];
+      const lines: string[] = ["Memory (SQLite)\n"];
+
+      lines.push("Documents:");
+      for (const name of docOrder) {
+        const doc = docByName.get(name);
+        const size = doc?.content.length ?? 0;
+        const flag = size > 0 ? "✓" : "empty";
+        lines.push(`• ${name} — ${size} chars ${flag}`);
+      }
+
+      const facts = countFacts();
+      lines.push(`\nFacts: ${facts}`);
+
+      const skills = listSkills();
+      lines.push(`\nSkills (${skills.length})`);
+      for (const skill of skills) {
+        const meta: string[] = [];
+        if (skill.category) meta.push(skill.category);
+        if (skill.version) meta.push(`v${skill.version}`);
+        const metaStr = meta.length > 0 ? ` (${meta.join(" · ")})` : "";
+        const desc = skill.description
+          ? `${skill.description.slice(0, 60)}${skill.description.length > 60 ? "..." : ""}`
+          : "";
+        lines.push(`• ${skill.name}${metaStr}${desc ? ` — ${desc}` : ""}`);
+      }
+
+      lines.push(
+        "\n/listskill • /skill <name> • /memory_search <q> • /memory_export to dump to .md",
+      );
+      await ctx.reply(truncate(lines.join("\n")));
+    } catch (error) {
+      logger.error("[MemoryCommands] /memfiles error:", error);
+      await ctx.reply("Failed to summarize memory.");
+    }
+  });
+
+  // /listskill — list installed skills with metadata.
+  bot.command("listskill", async (ctx) => {
+    try {
+      const skills = listSkills();
+      if (skills.length === 0) {
+        await ctx.reply(
+          "No skills installed.\nUse /skill_install <url> to add one.",
+        );
+        return;
+      }
+
+      const lines = [`Installed Skills (${skills.length})\n`];
       for (const skill of skills) {
         const meta: string[] = [];
         if (skill.category) meta.push(skill.category);
@@ -178,22 +281,23 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
         const metaStr = meta.length > 0 ? ` (${meta.join(" · ")})` : "";
         lines.push(`• ${skill.name}${metaStr}`);
         if (skill.description) {
-          const desc = skill.description.length > 80
-            ? `${skill.description.slice(0, 80)}...`
-            : skill.description;
+          const desc =
+            skill.description.length > 80
+              ? `${skill.description.slice(0, 80)}...`
+              : skill.description;
           lines.push(`  ${desc}`);
         }
       }
 
-      lines.push("\n/skill <name> to view a skill");
-      await ctx.reply(lines.join("\n"));
+      lines.push("\n/skill <name> to view • /skill_remove <name> to delete");
+      await ctx.reply(truncate(lines.join("\n")));
     } catch (error) {
       logger.error("[MemoryCommands] /listskill error:", error);
-      await ctx.reply("Failed to list skills");
+      await ctx.reply("Failed to list skills.");
     }
   });
 
-  // /skill <name> — view a specific skill
+  // /skill <name> — view a specific skill.
   bot.command("skill", async (ctx) => {
     try {
       const skillName = ctx.match?.trim();
@@ -202,22 +306,49 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
         return;
       }
 
-      const content = await readSkill(skillName);
-      if (!content.trim()) {
+      const skill = getSkill(skillName);
+      if (!skill) {
         await ctx.reply(
           `Skill "${skillName}" not found.\nUse /listskill to see available skills.`,
         );
         return;
       }
 
-      await ctx.reply(`Skill: ${skillName}\n\n${truncate(content)}`);
+      const integrity = verifySkillIntegrity(skillName);
+      const integritySuffix =
+        integrity && integrity.match
+          ? ""
+          : `\n\n⚠ Integrity check failed (sha256 changed since install).`;
+
+      await ctx.reply(`Skill: ${skillName}${integritySuffix}\n\n${truncate(skill.content)}`);
     } catch (error) {
       logger.error("[MemoryCommands] /skill error:", error);
-      await ctx.reply("Failed to read skill");
+      await ctx.reply("Failed to read skill.");
     }
   });
 
-  // /skill_install <url> — install a SKILL.md file from a GitHub URL
+  // /skill_remove <name> — uninstall a skill.
+  bot.command("skill_remove", async (ctx) => {
+    try {
+      const skillName = ctx.match?.trim();
+      if (!skillName) {
+        await ctx.reply("Usage: /skill_remove <name>");
+        return;
+      }
+      const ok = removeSkill(skillName);
+      if (!ok) {
+        await ctx.reply(`Skill "${skillName}" was not installed.`);
+        return;
+      }
+      appendAudit("skill_removed", { name: skillName, source: "telegram" });
+      await ctx.reply(`Removed skill: ${skillName}`);
+    } catch (error) {
+      logger.error("[MemoryCommands] /skill_remove error:", error);
+      await ctx.reply("Failed to remove skill.");
+    }
+  });
+
+  // /skill_install <url> — fetch a SKILL.md from a URL and store it in SQLite.
   bot.command("skill_install", async (ctx) => {
     try {
       const rawArg = ctx.match?.trim();
@@ -245,7 +376,7 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
         await ctx.api.editMessageText(
           ctx.chat.id,
           statusMsg.message_id,
-          `Failed to download skill: ${downloadErr instanceof Error ? downloadErr.message : "unknown error"}\n\nCheck the URL and try again.`,
+          `Failed to download skill: ${downloadErr instanceof Error ? downloadErr.message : "unknown error"}`,
         );
         return;
       }
@@ -263,9 +394,23 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
       const urlParts = url.split("/");
       const urlFilename = urlParts[urlParts.length - 1].replace(/\.md$/i, "");
       const rawName = parsed?.name ?? urlFilename ?? "unknown-skill";
-      const skillName = rawName.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/^-+|-+$/g, "") || "skill";
+      const skillName =
+        rawName.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/^-+|-+$/g, "") || "skill";
 
-      await writeSkill(skillName, content);
+      const skill = installSkill({
+        name: skillName,
+        content,
+        description: parsed?.description ?? null,
+        category: parsed?.category ?? null,
+        version: parsed?.version ?? null,
+        sourceUrl: url,
+      });
+      appendAudit("skill_installed", {
+        name: skillName,
+        sourceUrl: url,
+        sha256: skill.sha256,
+        source: "telegram",
+      });
 
       const lines = [`Skill installed: ${skillName}`];
       if (parsed?.description) lines.push(`Description: ${parsed.description.slice(0, 100)}`);
@@ -278,6 +423,66 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
     } catch (error) {
       logger.error("[MemoryCommands] /skill_install error:", error);
       await ctx.reply("Failed to install skill. Check the URL and try again.");
+    }
+  });
+
+  // /memory_export — dump all memory to memory/export-<timestamp>/ as .md files.
+  bot.command("memory_export", async (ctx) => {
+    try {
+      const memoryDir = process.env.MEMORY_DIR ?? "./memory";
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      const exportDir = path.resolve(memoryDir, `export-${ts}`);
+      await fs.mkdir(exportDir, { recursive: true });
+
+      // Documents -> <name>.md
+      const docs = listDocuments();
+      let docCount = 0;
+      for (const doc of docs) {
+        if (doc.content.trim()) {
+          await fs.writeFile(path.join(exportDir, `${doc.name}.md`), doc.content, "utf-8");
+          docCount++;
+        }
+      }
+
+      // Facts -> memory.md as bullets, prefixed by category if present
+      const allFacts = getRecentFacts(10000);
+      if (allFacts.length > 0) {
+        const lines = ["# Memory", "", "Long-term facts.", ""];
+        for (const f of allFacts.slice().reverse()) {
+          const cat = f.category ? `[${f.category}] ` : "";
+          lines.push(`- ${cat}${f.content}`);
+        }
+        await fs.writeFile(path.join(exportDir, "memory.md"), lines.join("\n"), "utf-8");
+      }
+
+      // Skills -> skills/<name>.md
+      const skills = listSkills();
+      if (skills.length > 0) {
+        const skillsDir = path.join(exportDir, "skills");
+        await fs.mkdir(skillsDir, { recursive: true });
+        for (const skill of skills) {
+          await fs.writeFile(path.join(skillsDir, `${skill.name}.md`), skill.content, "utf-8");
+        }
+      }
+
+      appendAudit("memory_exported", {
+        path: exportDir,
+        documents: docCount,
+        facts: allFacts.length,
+        skills: skills.length,
+      });
+
+      await ctx.reply(
+        [
+          `Exported memory to:`,
+          exportDir,
+          ``,
+          `${docCount} document(s), ${allFacts.length} fact(s), ${skills.length} skill(s)`,
+        ].join("\n"),
+      );
+    } catch (error) {
+      logger.error("[MemoryCommands] /memory_export error:", error);
+      await ctx.reply("Failed to export memory.");
     }
   });
 }

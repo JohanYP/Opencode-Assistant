@@ -21,6 +21,8 @@ export const fr: I18nDictionary = {
   "cmd.description.listskill": "Lister les compétences disponibles",
   "cmd.description.skill": "Voir une compétence spécifique",
   "cmd.description.skill_install": "Installer une compétence depuis une URL GitHub",
+  "cmd.description.skill_remove": "Désinstaller une compétence",
+  "cmd.description.memory_search": "Rechercher dans les faits enregistrés",
   "cmd.description.help": "Aide",
 
   "callback.unknown_command": "Commande inconnue",

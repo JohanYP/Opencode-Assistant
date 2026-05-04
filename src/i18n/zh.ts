@@ -21,6 +21,8 @@ export const zh: I18nDictionary = {
   "cmd.description.listskill": "列出可用技能",
   "cmd.description.skill": "查看特定技能",
   "cmd.description.skill_install": "从 GitHub URL 安装技能",
+  "cmd.description.skill_remove": "卸载技能",
+  "cmd.description.memory_search": "搜索已保存的事实",
   "cmd.description.help": "帮助",
 
   "callback.unknown_command": "未知命令",

@@ -21,6 +21,8 @@ export const ru: I18nDictionary = {
   "cmd.description.listskill": "Список доступных навыков",
   "cmd.description.skill": "Просмотр конкретного навыка",
   "cmd.description.skill_install": "Установить навык из URL GitHub",
+  "cmd.description.skill_remove": "Удалить навык",
+  "cmd.description.memory_search": "Поиск по сохранённым фактам",
   "cmd.description.help": "Справка",
 
   "callback.unknown_command": "Неизвестная команда",
