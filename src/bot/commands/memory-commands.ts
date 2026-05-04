@@ -1,10 +1,7 @@
-import https from "node:https";
-import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Bot, Context } from "grammy";
 import { logger } from "../../utils/logger.js";
-import { parseSkillFrontmatter } from "../../memory/manager.js";
 import {
   getDocument,
   listDocuments,
@@ -21,41 +18,19 @@ import {
 } from "../../memory/repositories/facts.js";
 import {
   getSkill,
-  installSkill,
   listSkills,
-  removeSkill,
   verifySkillIntegrity,
 } from "../../memory/repositories/skills.js";
 import { appendAudit } from "../../memory/repositories/audit.js";
-
-function downloadUrl(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const client = url.startsWith("https") ? https : http;
-    const req = client.get(url, (res) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode ?? "unknown"}`));
-        res.resume();
-        return;
-      }
-
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk: Buffer) => chunks.push(chunk));
-      res.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-      res.on("error", reject);
-    });
-
-    req.on("error", reject);
-    req.setTimeout(15_000, () => {
-      req.destroy(new Error("Request timeout"));
-    });
-  });
-}
-
-function toRawGitHubUrl(url: string): string {
-  return url
-    .replace("https://github.com/", "https://raw.githubusercontent.com/")
-    .replace("/blob/", "/");
-}
+import {
+  describeSkillStatuses,
+  installSkillFromUrl,
+  uninstallSkill,
+  updateAllSkills,
+  updateSkill,
+  verifyAllSkills,
+  type SkillStatus,
+} from "../../memory/skill-service.js";
 
 const MAX_TELEGRAM_MESSAGE = 4000;
 
@@ -87,6 +62,44 @@ function formatFactLine(fact: {
 }): string {
   const categoryTag = fact.category ? `[${fact.category}] ` : "";
   return `#${fact.id} ${categoryTag}${fact.content}`;
+}
+
+function formatStatusFlag(status: SkillStatus): string {
+  switch (status) {
+    case "up-to-date":
+      return "✓";
+    case "local-only":
+      return "(local)";
+    case "requires-not-met":
+      return "⚠ requires";
+    case "no-frontmatter":
+      return "⚠ no-frontmatter";
+  }
+}
+
+function formatUpdateResult(result: {
+  name: string;
+  status: "updated" | "unchanged" | "no_source" | "not_found" | "error";
+  oldSha256: string | null;
+  newSha256: string | null;
+  message?: string;
+}): string {
+  const shortSha = (s: string | null) => (s ? s.slice(0, 12) : "(none)");
+  switch (result.status) {
+    case "updated":
+      return (
+        `✓ Updated ${result.name}\n` +
+        `  ${shortSha(result.oldSha256)} → ${shortSha(result.newSha256)}`
+      );
+    case "unchanged":
+      return `= ${result.name} is already up-to-date (${shortSha(result.oldSha256)})`;
+    case "no_source":
+      return `− ${result.name}: no source URL stored (local skill)`;
+    case "not_found":
+      return `✗ ${result.name}: not installed`;
+    case "error":
+      return `✗ ${result.name}: ${result.message ?? "unknown error"}`;
+  }
 }
 
 /**
@@ -262,38 +275,150 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
     }
   });
 
-  // /listskill — list installed skills with metadata.
+  // /listskill — list installed skills grouped by category with status flag.
   bot.command("listskill", async (ctx) => {
     try {
-      const skills = listSkills();
-      if (skills.length === 0) {
+      const items = describeSkillStatuses();
+      if (items.length === 0) {
         await ctx.reply(
           "No skills installed.\nUse /skill_install <url> to add one.",
         );
         return;
       }
 
-      const lines = [`Installed Skills (${skills.length})\n`];
-      for (const skill of skills) {
-        const meta: string[] = [];
-        if (skill.category) meta.push(skill.category);
-        if (skill.version) meta.push(`v${skill.version}`);
-        const metaStr = meta.length > 0 ? ` (${meta.join(" · ")})` : "";
-        lines.push(`• ${skill.name}${metaStr}`);
-        if (skill.description) {
-          const desc =
-            skill.description.length > 80
-              ? `${skill.description.slice(0, 80)}...`
-              : skill.description;
-          lines.push(`  ${desc}`);
-        }
+      // Group by category. Skills without a category land in "(uncategorized)".
+      const grouped = new Map<string, Array<(typeof items)[number]>>();
+      for (const item of items) {
+        const key = item.skill.category ?? "(uncategorized)";
+        const list = grouped.get(key) ?? [];
+        list.push(item);
+        grouped.set(key, list);
       }
 
-      lines.push("\n/skill <name> to view • /skill_remove <name> to delete");
+      const orderedCategories = Array.from(grouped.keys()).sort((a, b) => {
+        // Push the placeholder category to the end.
+        if (a === "(uncategorized)") return 1;
+        if (b === "(uncategorized)") return -1;
+        return a.localeCompare(b);
+      });
+
+      const lines: string[] = [`Installed Skills (${items.length})\n`];
+      for (const category of orderedCategories) {
+        const list = grouped.get(category) ?? [];
+        lines.push(`▸ ${category} (${list.length})`);
+        for (const { skill, status } of list) {
+          const flag = formatStatusFlag(status);
+          const versionSuffix = skill.version ? ` v${skill.version}` : "";
+          lines.push(`  • ${skill.name}${versionSuffix} ${flag}`);
+          if (skill.description) {
+            const desc =
+              skill.description.length > 80
+                ? `${skill.description.slice(0, 80)}...`
+                : skill.description;
+            lines.push(`    ${desc}`);
+          }
+        }
+        lines.push("");
+      }
+
+      lines.push("/skill <name> · /skill_update [name] · /skill_remove <name>");
       await ctx.reply(truncate(lines.join("\n")));
     } catch (error) {
       logger.error("[MemoryCommands] /listskill error:", error);
       await ctx.reply("Failed to list skills.");
+    }
+  });
+
+  // /skill_verify — sha256 integrity check across all installed skills.
+  bot.command("skill_verify", async (ctx) => {
+    try {
+      const results = verifyAllSkills();
+      if (results.length === 0) {
+        await ctx.reply("No skills installed.");
+        return;
+      }
+
+      const failed = results.filter((r) => !r.match);
+      const ok = results.length - failed.length;
+
+      const lines = [`Skill Integrity Check (${results.length} skill(s))\n`];
+      lines.push(`✓ ${ok} OK · ✗ ${failed.length} mismatch`);
+
+      if (failed.length > 0) {
+        lines.push("\nFailures:");
+        for (const f of failed) {
+          lines.push(`• ${f.name}`);
+          lines.push(`  expected: ${f.expectedSha256?.slice(0, 12) ?? "(none)"}`);
+          lines.push(`  actual:   ${f.actualSha256.slice(0, 12)}`);
+        }
+        lines.push("\nMismatches likely mean DB tampering or bit-rot.");
+      }
+
+      await ctx.reply(truncate(lines.join("\n")));
+    } catch (error) {
+      logger.error("[MemoryCommands] /skill_verify error:", error);
+      await ctx.reply("Failed to verify skills.");
+    }
+  });
+
+  // /skill_update [name] — re-download from source URL and update sha256.
+  bot.command("skill_update", async (ctx) => {
+    try {
+      const arg = ctx.match?.trim();
+
+      if (arg) {
+        const skill = getSkill(arg);
+        if (!skill) {
+          await ctx.reply(`Skill "${arg}" not found.`);
+          return;
+        }
+        const status = await ctx.reply(`Updating ${arg} from ${skill.sourceUrl ?? "?"}...`);
+        const result = await updateSkill(arg);
+        await ctx.api.editMessageText(
+          ctx.chat.id,
+          status.message_id,
+          formatUpdateResult(result),
+        );
+        return;
+      }
+
+      const skills = listSkills();
+      if (skills.length === 0) {
+        await ctx.reply("No skills installed.");
+        return;
+      }
+      const status = await ctx.reply(
+        `Updating ${skills.length} skill(s) from their source URLs...`,
+      );
+      const results = await updateAllSkills();
+
+      const updated = results.filter((r) => r.status === "updated");
+      const unchanged = results.filter((r) => r.status === "unchanged");
+      const noSource = results.filter((r) => r.status === "no_source");
+      const errored = results.filter((r) => r.status === "error");
+
+      const lines = [
+        `Skill update done (${results.length} skill(s)):`,
+        `  ✓ ${updated.length} updated`,
+        `  = ${unchanged.length} already up-to-date`,
+        `  − ${noSource.length} local-only (no source URL)`,
+        `  ✗ ${errored.length} failed`,
+      ];
+      if (updated.length > 0) {
+        lines.push("\nUpdated:");
+        for (const r of updated) lines.push(`• ${r.name}`);
+      }
+      if (errored.length > 0) {
+        lines.push("\nFailures:");
+        for (const r of errored) {
+          lines.push(`• ${r.name}: ${r.message ?? "unknown error"}`);
+        }
+      }
+
+      await ctx.api.editMessageText(ctx.chat.id, status.message_id, truncate(lines.join("\n")));
+    } catch (error) {
+      logger.error("[MemoryCommands] /skill_update error:", error);
+      await ctx.reply("Failed to update skill(s).");
     }
   });
 
@@ -335,12 +460,11 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
         await ctx.reply("Usage: /skill_remove <name>");
         return;
       }
-      const ok = removeSkill(skillName);
+      const ok = uninstallSkill(skillName, "telegram");
       if (!ok) {
         await ctx.reply(`Skill "${skillName}" was not installed.`);
         return;
       }
-      appendAudit("skill_removed", { name: skillName, source: "telegram" });
       await ctx.reply(`Removed skill: ${skillName}`);
     } catch (error) {
       logger.error("[MemoryCommands] /skill_remove error:", error);
@@ -362,64 +486,33 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
         return;
       }
 
-      const url =
-        rawArg.includes("github.com") && rawArg.includes("/blob/")
-          ? toRawGitHubUrl(rawArg)
-          : rawArg;
-
       const statusMsg = await ctx.reply("Downloading skill...");
 
-      let content: string;
+      let result: Awaited<ReturnType<typeof installSkillFromUrl>>;
       try {
-        content = await downloadUrl(url);
-      } catch (downloadErr) {
+        result = await installSkillFromUrl(rawArg);
+      } catch (err) {
         await ctx.api.editMessageText(
           ctx.chat.id,
           statusMsg.message_id,
-          `Failed to download skill: ${downloadErr instanceof Error ? downloadErr.message : "unknown error"}`,
+          `Failed to install skill: ${err instanceof Error ? err.message : "unknown error"}`,
         );
         return;
       }
 
-      if (!content.trim()) {
-        await ctx.api.editMessageText(
-          ctx.chat.id,
-          statusMsg.message_id,
-          "Downloaded file is empty.",
-        );
-        return;
+      const { skill, slug, warnings } = result;
+      const lines = [`Skill installed: ${slug}`];
+      if (skill.description) lines.push(`Description: ${skill.description.slice(0, 100)}`);
+      if (skill.category) lines.push(`Category: ${skill.category}`);
+      if (skill.version) lines.push(`Version: ${skill.version}`);
+      if (warnings.length > 0) {
+        lines.push("", "⚠ Warnings:");
+        for (const w of warnings) lines.push(`  • ${w}`);
       }
-
-      const parsed = parseSkillFrontmatter(content);
-      const urlParts = url.split("/");
-      const urlFilename = urlParts[urlParts.length - 1].replace(/\.md$/i, "");
-      const rawName = parsed?.name ?? urlFilename ?? "unknown-skill";
-      const skillName =
-        rawName.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/^-+|-+$/g, "") || "skill";
-
-      const skill = installSkill({
-        name: skillName,
-        content,
-        description: parsed?.description ?? null,
-        category: parsed?.category ?? null,
-        version: parsed?.version ?? null,
-        sourceUrl: url,
-      });
-      appendAudit("skill_installed", {
-        name: skillName,
-        sourceUrl: url,
-        sha256: skill.sha256,
-        source: "telegram",
-      });
-
-      const lines = [`Skill installed: ${skillName}`];
-      if (parsed?.description) lines.push(`Description: ${parsed.description.slice(0, 100)}`);
-      if (parsed?.category) lines.push(`Category: ${parsed.category}`);
-      if (parsed?.version) lines.push(`Version: ${parsed.version}`);
-      lines.push("", `Use /skill ${skillName} to view it.`);
+      lines.push("", `Use /skill ${slug} to view it.`);
 
       await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, lines.join("\n"));
-      logger.info(`[MemoryCommands] Installed skill from URL: ${skillName}`);
+      logger.info(`[MemoryCommands] Installed skill from URL: ${slug}`);
     } catch (error) {
       logger.error("[MemoryCommands] /skill_install error:", error);
       await ctx.reply("Failed to install skill. Check the URL and try again.");

@@ -18,6 +18,8 @@ export const en = {
   "cmd.description.listskill": "List available skills",
   "cmd.description.skill": "View a specific skill",
   "cmd.description.skill_install": "Install a skill from a GitHub URL",
+  "cmd.description.skill_update": "Re-download installed skills from their source URL",
+  "cmd.description.skill_verify": "Check sha256 integrity of installed skills",
   "cmd.description.skill_remove": "Uninstall a skill",
   "cmd.description.memory_search": "Search saved facts",
   "cmd.description.help": "Help",

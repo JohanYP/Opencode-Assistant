@@ -21,6 +21,8 @@ export const de: I18nDictionary = {
   "cmd.description.listskill": "Verfügbare Skills auflisten",
   "cmd.description.skill": "Einen bestimmten Skill anzeigen",
   "cmd.description.skill_install": "Einen Skill von einer GitHub-URL installieren",
+  "cmd.description.skill_update": "Skills von ihrer Quell-URL erneut herunterladen",
+  "cmd.description.skill_verify": "sha256-Integrität der Skills prüfen",
   "cmd.description.skill_remove": "Skill deinstallieren",
   "cmd.description.memory_search": "In gespeicherten Fakten suchen",
   "cmd.description.help": "Hilfe",
