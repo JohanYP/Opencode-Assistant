@@ -1047,10 +1047,15 @@ SUMMARY_EOF
     echo "    Update:       git pull && docker compose up -d --build"
     echo "    Reconfigure:  ./setup.sh"
     echo ""
+    echo -e "  ${BOLD}Next:${NC} 5-minute walkthrough at docs/QUICK_DEMO.md"
+    echo "        Troubleshooting recipes at docs/TROUBLESHOOTING.md"
+    echo ""
   else
     echo ""
     echo "Setup complete. To launch the assistant, run:"
     echo -e "  ${BOLD}docker compose up -d${NC}"
+    echo ""
+    echo "  Then walk through docs/QUICK_DEMO.md for a 5-minute tour."
     echo ""
   fi
 }

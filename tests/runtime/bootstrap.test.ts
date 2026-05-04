@@ -87,20 +87,23 @@ describe("runtime/bootstrap", () => {
       ENV_EXAMPLE_CONTENT,
     );
 
-    expect(updated).toContain("# Telegram Bot Token (from @BotFather)");
+    // Header / structural comments from the current .env.example template.
+    expect(updated).toContain("# Get your bot token from @BotFather on Telegram");
     expect(updated).toContain("TELEGRAM_BOT_TOKEN=token:value");
     expect(updated).toContain("TELEGRAM_ALLOWED_USER_ID=42");
-    expect(updated).toContain("# Telegram Proxy URL (optional)");
-    expect(updated).toContain("# OPENCODE_API_URL=http://localhost:4096");
+    expect(updated).toContain("# Optional: SOCKS5 or HTTP proxy for Telegram API");
+    // OPENCODE_API_URL is now active in the template (defaults to the
+    // compose-network address) since bot-only mode was dropped.
+    expect(updated).toContain("OPENCODE_API_URL=http://opencode:4096");
     expect(updated).toContain("OPENCODE_SERVER_USERNAME=opencode");
     expect(updated).toContain("# OPENCODE_SERVER_PASSWORD=");
     expect(updated).toContain("BOT_LOCALE=ru");
-    expect(updated).toContain("# Hide thinking indicator messages (default: false)");
+    expect(updated).toContain("# Thinking message");
 
-    expect(updated.indexOf("# Telegram Bot Token (from @BotFather)")).toBeLessThan(
+    expect(updated.indexOf("# Get your bot token from @BotFather on Telegram")).toBeLessThan(
       updated.indexOf("TELEGRAM_BOT_TOKEN=token:value"),
     );
-    expect(updated.indexOf("# Bot locale: supported locale code (default: en)")).toBeLessThan(
+    expect(updated.indexOf("# Language: en, es, de, fr, ru, zh")).toBeLessThan(
       updated.indexOf("BOT_LOCALE=ru"),
     );
   });
@@ -154,7 +157,10 @@ describe("runtime/bootstrap", () => {
       ENV_EXAMPLE_CONTENT,
     );
 
-    expect(updated).toContain("# OPENCODE_API_URL=http://localhost:4096");
+    // OPENCODE_API_URL reverts to the template's default (compose-network address)
+    // because the wizard didn't pass an override and the template line is active.
+    // OPENCODE_SERVER_PASSWORD reverts to the commented optional placeholder.
+    expect(updated).toContain("OPENCODE_API_URL=http://opencode:4096");
     expect(updated).toContain("# OPENCODE_SERVER_PASSWORD=");
     expect(updated).not.toContain("OPENCODE_API_URL=https://example.com");
     expect(updated).not.toContain("OPENCODE_SERVER_PASSWORD=old-password");

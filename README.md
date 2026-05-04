@@ -5,12 +5,39 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
 [![OpenCode](https://img.shields.io/badge/Powered%20by-OpenCode-black)](https://opencode.ai)
 [![OpenClaw Skills](https://img.shields.io/badge/OpenClaw-Skills%20compatible-orange)](https://github.com/topics/openclaw-skills)
+[![SQLite memory](https://img.shields.io/badge/Memory-SQLite%20%2B%20MCP-blue)](docs/MCP_INTEGRATION.md)
 
 A fully-featured **personal AI assistant** running in Telegram, powered by [OpenCode](https://opencode.ai) and the free `big-pickle` model (Claude Sonnet). No subscriptions, no API costs — completely free to run.
 
 Persistent memory across sessions, scheduled tasks with continue/cancel buttons that inject results into your active chat, voice replies, and one-command MCP server installation. Deploy in minutes with a single guided setup script. Everything runs locally on your machine or server.
 
-> **Roadmap note**: the project is moving toward SQLite-backed memory exposed to OpenCode through a local MCP server (memory becomes live across sessions instead of a snapshot at session start), and Docker becoming the only supported install path. See [`PRODUCT.md`](./PRODUCT.md#roadmap) and [`CONCEPT.md`](./CONCEPT.md) for the direction.
+## Architecture at a glance
+
+```
+┌──────────────┐                ┌────────────────────────────┐
+│ Telegram     │  Bot API       │       bot container        │
+│ (your phone) │ <───────────►  │  grammY · MCP HTTP :4097   │
+└──────────────┘                │  SQLite memory (data.db)   │
+                                └─────────────┬──────────────┘
+                                              │ HTTP /mcp
+                                              ▼
+                                ┌────────────────────────────┐
+                                │     opencode container     │
+                                │  opencode serve :4096      │
+                                │  big-pickle / Claude       │
+                                └────────────────────────────┘
+```
+
+Everything runs in Docker (one `docker compose up -d`). The bot owns the
+SQLite memory and exposes it to OpenCode through a local MCP server, so
+the assistant can read **and write** memory at any point during a
+session — not just receive a snapshot at session start.
+
+**Quick links:**
+- [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — first 5 minutes after install
+- [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — how the memory tools wire into OpenCode
+- [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — symptom-to-fix lookup
+- [`PRODUCT.md`](./PRODUCT.md#roadmap) and [`CONCEPT.md`](./CONCEPT.md) — direction and boundaries
 
 ---
 
@@ -391,6 +418,24 @@ Available scripts:
 ## License
 
 [MIT](LICENSE)
+
+---
+
+## How does it compare?
+
+|  | Opencode-Assistant | Claude Desktop / OpenClaw runtime | Plain OpenCode TUI/CLI |
+|---|---|---|---|
+| Surface | Telegram (mobile-friendly) | Native desktop app / web | Local terminal |
+| AI engine | OpenCode (local server) | Claude API or Claw runtime | OpenCode |
+| Memory | SQLite + MCP (live, queryable mid-session) | Conversation memory + long-term in some clients | Per-session, no cross-session memory |
+| Skills | Drop-in OpenClaw SKILL.md, sha256 verified, source-URL re-fetch | OpenClaw SKILL.md | Custom commands |
+| Default model | `big-pickle` (Claude Sonnet, free) | Subscription-based | Whatever you configure |
+| Multi-machine | One self-hosted instance per user; share via Telegram | Per device | Per machine |
+| Setup | `./setup.sh` + `docker compose up -d` | App install | `npm install -g opencode-ai` |
+
+The assistant is positioned as the **personal-use, mobile-first**
+counterpart to OpenCode's local-developer tooling, with the OpenClaw
+skill ecosystem as a shared standard between both worlds.
 
 ---
 
