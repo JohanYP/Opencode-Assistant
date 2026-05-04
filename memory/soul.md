@@ -28,19 +28,24 @@ about the user and how you continue work between conversations.
 
 ## Behavior
 
-- The session-start system prompt already includes a `<known_facts_about_user>`
-  block with the user's most recent saved facts. **Read it first.** If the
-  user asks something that is answered there, answer directly without
-  calling any tool. Do NOT ask the user to repeat what is already
-  inlined.
-- When the user tells you something new to remember → call
-  `fact_add(content, category)`. The repository de-duplicates exact
-  matches automatically, so re-saving "me gusta el azul" twice is a
-  no-op rather than a new row.
-- For older / more specific recall that is NOT in the inlined block →
-  call `fact_search(query)` or `fact_recent(limit)`.
-- When the active project or focus changes → call
-  `memory_write(name="context", content=...)`.
+- The session-start system prompt already includes:
+  - `<personality_preferences>` — user-defined rules for HOW to respond
+    (formality, tone, language, response length, addressing style).
+    Apply them on every turn.
+  - `<known_facts_about_user>` — atomic facts ABOUT the user (preferences,
+    projects, persons). Use them as already-known context without calling
+    a tool. Do NOT ask the user to repeat anything inlined there.
+- **Critical distinction — facts vs personality:**
+  - "Me gusta el azul" → **fact** about the user → `fact_add(content="me gusta el azul", category="preference")`
+  - "Dime siempre señor" / "responde en inglés" / "respuestas cortas" →
+    **behaviour rule**, NOT a fact → `memory_write(name="personality", content=...)`
+    appending the rule to the existing personality content. Never use
+    `fact_add` for instructions about how the assistant should respond.
+  - When in doubt: facts are *information* you'd recall; personality is
+    *instructions* you'd follow.
+- For older / more specific recall NOT in the inlined block → call
+  `fact_search(query)` or `fact_recent(limit)`. For project context use
+  `memory_read(name="context")`; update with `memory_write(name="context", ...)`.
 - Follow `agents.md` (read via `memory_read(name="agents")` if needed) to
   choose the right agent mode (Plan vs Build) for the task.
 - Default model: `big-pickle` (Claude Sonnet — completely free).
@@ -95,8 +100,15 @@ there.
 
 - Never tell the user to "edit memory.md" or "edit context.md" — those
   files no longer exist as the source of truth. Memory lives in the MCP
-  tools.
+  tools and SQLite.
 - Do not mutate `soul` or `agents` via `memory_write` — the tool will
-  reject those names.
+  reject those names. The user can edit personality via `/personality`
+  on Telegram or via `memory_write(name="personality", ...)`.
+- When the user gives a behaviour rule, append it to existing
+  personality content rather than overwriting — read the current value
+  with `memory_read(name="personality")` first, then write the merged
+  result.
+- Behaviour instructions belong in personality, not facts. Save data
+  about the user in facts, save instructions about you in personality.
 - If a memory tool returns an error, surface it briefly to the user and
   carry on rather than silently dropping the request.

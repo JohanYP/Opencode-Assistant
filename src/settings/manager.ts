@@ -25,6 +25,18 @@ export interface SessionDirectoryCacheInfo {
   }>;
 }
 
+export interface UiPreferences {
+  /**
+   * Whether tool-call messages such as "(Read memory.md)" or "(Edit foo.ts)"
+   * should appear in chat. When false, only assistant final responses are
+   * sent to Telegram. Persists across restarts.
+   *
+   * Defaults to true (visible) so existing behaviour is unchanged for
+   * users who never set it.
+   */
+  showToolMessages?: boolean;
+}
+
 export interface Settings {
   currentProject?: ProjectInfo;
   currentSession?: SessionInfo;
@@ -34,6 +46,7 @@ export interface Settings {
   ttsEnabled?: boolean;
   sessionDirectoryCache?: SessionDirectoryCacheInfo;
   scheduledTasks?: ScheduledTask[];
+  uiPreferences?: UiPreferences;
 }
 
 function cloneScheduledTasks(tasks: ScheduledTask[] | undefined): ScheduledTask[] | undefined {
@@ -179,6 +192,25 @@ export function getScheduledTasks(): ScheduledTask[] {
 
 export function setScheduledTasks(tasks: ScheduledTask[]): Promise<void> {
   currentSettings.scheduledTasks = cloneScheduledTasks(tasks);
+  return writeSettingsFile(currentSettings);
+}
+
+const DEFAULT_UI_PREFERENCES: Required<UiPreferences> = {
+  showToolMessages: true,
+};
+
+export function getUiPreferences(): Required<UiPreferences> {
+  return {
+    ...DEFAULT_UI_PREFERENCES,
+    ...(currentSettings.uiPreferences ?? {}),
+  };
+}
+
+export function setUiPreferences(prefs: Partial<UiPreferences>): Promise<void> {
+  currentSettings.uiPreferences = {
+    ...(currentSettings.uiPreferences ?? {}),
+    ...prefs,
+  };
   return writeSettingsFile(currentSettings);
 }
 

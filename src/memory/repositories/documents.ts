@@ -1,13 +1,22 @@
 import { getDb } from "../db.js";
 
 /**
- * Reserved document names. The `soul` and `agents` documents define the
- * assistant's identity and agent-selection rules; they are typically
- * read-only at runtime and should be edited deliberately. The `context`
- * and `session-summary` documents change frequently and are meant to be
- * mutated by OpenCode through MCP tools.
+ * Reserved document names.
+ * - `soul`, `agents`: assistant identity and agent-selection rules. They
+ *   ship with the project and are mirrored to SQLite at startup from
+ *   their .md files. Read-only at the MCP layer.
+ * - `context`: current project context. Mutated by OpenCode through MCP.
+ * - `session-summary`: cross-session continuity, MCP-writable.
+ * - `personality`: user-editable behavior rules (how to address the user,
+ *   tone, language, response style). Editable both via Telegram
+ *   (/personality) and OpenCode MCP (memory_write).
  */
-export type DocumentName = "soul" | "agents" | "context" | "session-summary";
+export type DocumentName =
+  | "soul"
+  | "agents"
+  | "context"
+  | "session-summary"
+  | "personality";
 
 export interface Document {
   name: DocumentName;

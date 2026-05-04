@@ -31,6 +31,7 @@ import {
   verifyAllSkills,
   type SkillStatus,
 } from "../../memory/skill-service.js";
+import { getUiPreferences, setUiPreferences } from "../../settings/manager.js";
 
 const MAX_TELEGRAM_MESSAGE = 4000;
 
@@ -125,6 +126,83 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
     } catch (error) {
       logger.error("[MemoryCommands] /agents_md error:", error);
       await ctx.reply("Failed to read agents document.");
+    }
+  });
+
+  // /personality [text] — view or replace the user-editable behaviour
+  // rules document. Use this for things the assistant should consistently
+  // follow ("dime siempre señor", "contesta en inglés", tone, formality,
+  // response length) — distinct from facts about the user.
+  bot.command("personality", async (ctx) => {
+    try {
+      const arg = ctx.match?.trim();
+      if (arg) {
+        setDocument("personality", arg);
+        appendAudit("document_updated", { name: "personality", source: "telegram" });
+        await ctx.reply(
+          "Personality updated. Open a new session (/new) for the change to apply " +
+            "to the assistant's behaviour.",
+        );
+        return;
+      }
+
+      const doc = getDocument("personality");
+      if (!doc || !doc.content.trim()) {
+        await ctx.reply(
+          "Personality is empty.\n\n" +
+            "Use /personality <text> to set behaviour rules. Examples:\n" +
+            '  /personality dime siempre "señor". Tono formal y en español.\n' +
+            "  /personality respuestas concisas, máximo 3 líneas\n" +
+            "  /personality habla siempre en inglés salvo que pregunte explícitamente en otro idioma\n\n" +
+            "Personality is for HOW you want the assistant to respond. " +
+            "Save FACTS about you with /memory or by telling the assistant to " +
+            "remember them.",
+        );
+        return;
+      }
+      await ctx.reply(`Personality\n\n${truncate(doc.content)}`);
+    } catch (error) {
+      logger.error("[MemoryCommands] /personality error:", error);
+      await ctx.reply("Failed to access personality.");
+    }
+  });
+
+  // /show_tools <on|off> — toggle visibility of tool-call messages such
+  // as "(Read memory.md)" or "(Edit foo.ts)". Persisted in settings.json.
+  bot.command("show_tools", async (ctx) => {
+    try {
+      const arg = ctx.match?.trim().toLowerCase();
+      const current = getUiPreferences().showToolMessages;
+
+      if (!arg) {
+        await ctx.reply(
+          `Tool messages are currently ${current ? "VISIBLE" : "HIDDEN"}.\n\n` +
+            "Usage:\n" +
+            "  /show_tools on  — show tool calls (default)\n" +
+            "  /show_tools off — hide them, only assistant responses appear",
+        );
+        return;
+      }
+
+      let next: boolean;
+      if (arg === "on" || arg === "true" || arg === "yes" || arg === "1") {
+        next = true;
+      } else if (arg === "off" || arg === "false" || arg === "no" || arg === "0") {
+        next = false;
+      } else {
+        await ctx.reply("Invalid value. Use /show_tools on or /show_tools off.");
+        return;
+      }
+
+      await setUiPreferences({ showToolMessages: next });
+      await ctx.reply(
+        next
+          ? "Tool messages are now VISIBLE."
+          : "Tool messages are now HIDDEN. Only assistant responses will appear.",
+      );
+    } catch (error) {
+      logger.error("[MemoryCommands] /show_tools error:", error);
+      await ctx.reply("Failed to update tool visibility setting.");
     }
   });
 

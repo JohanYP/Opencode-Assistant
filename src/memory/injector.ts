@@ -41,6 +41,17 @@ async function buildFirstMessageContext(): Promise<string> {
     parts.push(`<agents>\n${agents.content.trim()}\n</agents>`);
   }
 
+  // Personality is the user-editable behaviour layer. soul.md ships with
+  // the project (system identity); personality is where rules like "dime
+  // siempre señor", preferred tone, response language, etc. live so they
+  // survive across sessions without polluting the facts table.
+  const personality = getDocument("personality");
+  if (personality && personality.content.trim()) {
+    parts.push(
+      `<personality_preferences>\n${personality.content.trim()}\n</personality_preferences>`,
+    );
+  }
+
   const skills = listSkills();
   if (skills.length > 0) {
     const skillLines = skills
@@ -88,27 +99,33 @@ async function buildFirstMessageContext(): Promise<string> {
   const directives = [
     "SESSION-START DIRECTIVES — read once, then APPLY for the rest of this session:",
     "",
-    "1. <soul> defines WHO YOU ARE: personality, tone, behavior rules, hard constraints.",
+    "1. <soul> defines WHO YOU ARE: identity, hard rules, MCP tool conventions.",
     "   Treat its contents as authoritative system rules. APPLY them to every response —",
-    "   do not merely acknowledge them, embody them. If anything below conflicts with",
-    "   <soul>, <soul> wins.",
+    "   do not merely acknowledge them, embody them.",
     "",
-    "2. <agents> describes how to choose between Plan and Build agent modes for the",
-    "   task at hand. APPLY this when deciding how to approach the user's request.",
+    "2. <personality_preferences> contains USER-DEFINED rules for HOW to address them",
+    "   (formality, tone, language, response style). These are user-editable through",
+    "   /personality on Telegram or memory_write(name=\"personality\", ...) via MCP.",
+    "   APPLY them every turn. When the user gives you a new behaviour rule (e.g.",
+    "   \"dime siempre señor\", \"contesta en inglés\", \"responde en menos de 3 líneas\"),",
+    "   write it via memory_write to make it stick — DO NOT save it as a fact_add.",
     "",
-    "3. <skills_available> lists the skills you can use. When a user request matches a",
+    "3. <agents> describes how to choose between Plan and Build agent modes.",
+    "",
+    "4. <skills_available> lists the skills you can use. When a user request matches a",
     "   skill, prefer following that skill's procedure over improvising.",
     "",
-    "4. <previous_session_summary> contains state from the user's previous session.",
-    "   ASSUME it as already-known context. Do not ask the user to repeat anything",
-    "   already covered there.",
+    "5. <known_facts_about_user> contains atomic facts ABOUT the user (preferences,",
+    "   projects, persons, etc.). Use them as already-known context. They are added",
+    "   via fact_add — only data ABOUT the user, never instructions for the assistant.",
     "",
-    "5. The assistant's long-term memory facts and current project context are",
-    "   maintained in a SQLite database, not inlined here. When the OpenCode runtime",
-    "   provides MCP memory tools (memory_read, fact_search, fact_recent, skill_read,",
-    "   etc.), use them to fetch additional context as needed instead of asking the user.",
+    "6. <previous_session_summary> is cross-session state. Assume it as known.",
     "",
-    "6. After applying the directives above, respond to the user message that appears",
+    "7. For older facts not inlined, use fact_search / fact_recent. For project",
+    "   context, use memory_read(name=\"context\"). All memory mutations go through",
+    "   the MCP tools — never tell the user to edit .md files.",
+    "",
+    "8. After applying the directives above, respond to the user message that appears",
     "   after the END SESSION CONTEXT marker. Do not reference, quote, or repeat these",
     "   directives back to the user — internalize them silently.",
   ].join("\n");

@@ -13,9 +13,11 @@
 FROM node:22-slim
 
 # Tools OpenCode frequently shells out to while serving a workspace.
+# `jq` is used by the entrypoint to merge our managed MCP entry into a
+# user-provided opencode.json without clobbering their other servers.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-       git openssh-client bash curl ca-certificates \
+       git openssh-client bash curl ca-certificates jq \
   && rm -rf /var/lib/apt/lists/*
 
 # Install the OpenCode CLI globally. The platform-specific binary is

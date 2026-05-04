@@ -2,6 +2,18 @@ import { config } from "../config.js";
 import { attachManager } from "../attach/manager.js";
 import { markAttachedSessionBusy, markAttachedSessionIdle } from "../attach/service.js";
 import { externalUserInputSuppressionManager } from "../external-input/suppression.js";
+import { getUiPreferences } from "../settings/manager.js";
+
+/**
+ * Tool-call messages are hidden when either the static env-var setting
+ * (HIDE_TOOL_CALL_MESSAGES) is on, or the runtime UI preference set via
+ * /show_tools off is in effect. The runtime check is re-read on every
+ * event so /show_tools toggles apply without restarting the bot.
+ */
+function shouldHideToolMessages(): boolean {
+  if (config.bot.hideToolCallMessages) return true;
+  return !getUiPreferences().showToolMessages;
+}
 import { t } from "../i18n/index.js";
 import { interactionManager as _interactionManager } from "../interaction/manager.js";
 import { clearAllInteractionState } from "../interaction/cleanup.js";
@@ -239,7 +251,7 @@ export function createEventSubscriber(
           toolInfo.tool === "apply_patch");
 
       if (
-        config.bot.hideToolCallMessages ||
+        shouldHideToolMessages() ||
         shouldIncludeToolInfoInFileCaption ||
         toolInfo.tool === "task"
       ) {
@@ -263,7 +275,7 @@ export function createEventSubscriber(
         return;
       }
 
-      if (config.bot.hideToolCallMessages) {
+      if (shouldHideToolMessages()) {
         return;
       }
 

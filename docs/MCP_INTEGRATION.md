@@ -78,8 +78,75 @@ In Docker compose (default):
   }
   ```
 
-If you provide your own `opencode.json` in the `opencode-config` volume,
-the entrypoint will leave it alone — your config wins.
+The entrypoint **merges** the memory MCP entry into your `opencode.json`
+without touching the rest of the file, so any extra MCP servers you
+add by hand (GitHub, Google Workspace, custom auth-requiring servers)
+survive every container rebuild.
+
+## Adding third-party MCP servers (with credentials)
+
+Because the entrypoint preserves user-added servers, you can extend
+the catalogue safely. Two patterns:
+
+### A. stdio MCP server (most npm-based MCPs)
+
+Many community MCP servers ship as `npx` packages. Example: GitHub.
+
+1. Add the credential to `.env`:
+   ```bash
+   GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx...
+   ```
+
+2. Pass it through to the opencode container in `docker-compose.yml`:
+   ```yaml
+   services:
+     opencode:
+       environment:
+         - ASSISTANT_MEMORY_MCP_URL=http://bot:4097/mcp
+         - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}
+   ```
+
+3. Inside the running opencode container, append the server to
+   `opencode.json` once — the entrypoint won't undo this:
+   ```bash
+   docker compose exec opencode sh -c '
+   jq ".mcp.github = {
+     type: \"local\",
+     command: [\"npx\", \"-y\", \"@modelcontextprotocol/server-github\"],
+     env: { GITHUB_PERSONAL_ACCESS_TOKEN: \"$GITHUB_PERSONAL_ACCESS_TOKEN\" }
+   }" /root/.config/opencode/opencode.json > /tmp/oc.json && mv /tmp/oc.json /root/.config/opencode/opencode.json'
+   docker compose restart opencode
+   ```
+
+4. Verify in the opencode logs that the server is loaded; from a
+   Telegram session ask the assistant to use the new tools.
+
+### B. Remote (HTTP) MCP server
+
+If the third-party server runs as its own service and exposes an HTTP
+endpoint:
+
+```bash
+docker compose exec opencode sh -c '
+jq ".mcp[\"my-remote\"] = {
+  type: \"remote\",
+  url: \"https://my-mcp.example.com/mcp\"
+}" /root/.config/opencode/opencode.json > /tmp/oc.json && mv /tmp/oc.json /root/.config/opencode/opencode.json'
+docker compose restart opencode
+```
+
+### Things to watch for
+
+- **OAuth flows**: most MCP servers that integrate with Google
+  Workspace etc. require a one-time browser login to mint a refresh
+  token, then store it. Run that login on the host or in a separate
+  step before configuring the MCP server in the container.
+- **Token rotation**: if a token expires, the assistant will start
+  getting "invalid tool" or auth errors. Re-issue the token, update
+  `.env`, and restart.
+- **No native bot UX yet**: there's no `/mcp_install` command in
+  Telegram. Adding/removing third-party servers is a host-side
+  operation. A guided flow is on the roadmap.
 
 ## Verifying the wiring
 

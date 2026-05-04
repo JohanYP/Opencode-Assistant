@@ -28,6 +28,11 @@ const SERVER_NAME = "opencode-assistant-memory";
 const SERVER_VERSION = "0.1.0";
 
 const READ_ONLY_DOCUMENT_NAMES = new Set<DocumentName>(["soul", "agents"]);
+const WRITABLE_DOCUMENT_NAMES = new Set<DocumentName>([
+  "context",
+  "session-summary",
+  "personality",
+]);
 
 /**
  * Definitions of the tools this server exposes to OpenCode.
@@ -40,13 +45,13 @@ export const MEMORY_TOOLS = [
   {
     name: "memory_read",
     description:
-      "Read a memory document by name. Available documents: soul (identity), agents (agent selection rules), context (current project), session-summary (cross-session state).",
+      "Read a memory document by name. Available documents: soul (identity, read-only), agents (agent selection rules, read-only), context (current project, writable), session-summary (cross-session state, writable), personality (user-defined behaviour rules like preferred tone / formality / language, writable).",
     inputSchema: {
       type: "object",
       properties: {
         name: {
           type: "string",
-          enum: ["soul", "agents", "context", "session-summary"],
+          enum: ["soul", "agents", "context", "session-summary", "personality"],
           description: "Document name",
         },
       },
@@ -56,14 +61,14 @@ export const MEMORY_TOOLS = [
   {
     name: "memory_write",
     description:
-      "Write a memory document. Only context and session-summary are writable; soul and agents are read-only identity files.",
+      "Write a memory document. Writable documents: context, session-summary, personality. soul and agents are read-only identity files. Use 'personality' to persist user-defined behaviour rules (e.g. \"dime siempre señor\", \"contesta en inglés\", \"responses ≤ 3 lines\") — those are NOT facts and should NOT be saved with fact_add.",
     inputSchema: {
       type: "object",
       properties: {
         name: {
           type: "string",
-          enum: ["context", "session-summary"],
-          description: "Document name (context or session-summary only)",
+          enum: ["context", "session-summary", "personality"],
+          description: "Document name (context, session-summary, or personality)",
         },
         content: {
           type: "string",
@@ -245,7 +250,7 @@ function executeToolCall(params: ToolCallParams | undefined): unknown {
           `Document '${name}' is read-only and cannot be written via memory_write`,
         );
       }
-      if (name !== "context" && name !== "session-summary") {
+      if (!WRITABLE_DOCUMENT_NAMES.has(name)) {
         throw new RpcError(
           ErrorCode.InvalidParams,
           `Unknown writable document: ${name}`,
@@ -253,7 +258,7 @@ function executeToolCall(params: ToolCallParams | undefined): unknown {
       }
       const content = requireString(args, "content");
       const doc = setDocument(name, content);
-      appendAudit("document_updated", { name, length: content.length });
+      appendAudit("document_updated", { name, length: content.length, source: "mcp" });
       return asJsonContent({ ok: true, name: doc.name, updatedAt: doc.updatedAt });
     }
 
