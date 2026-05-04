@@ -1520,4 +1520,256 @@ describe("summary/aggregator", () => {
 
     expect(onTokens).not.toHaveBeenCalled();
   });
+
+  // ── Cost callback ─────────────────────────────────────────────────────────
+  it("fires onCost with the message cost on completion", () => {
+    const onCost = vi.fn();
+    summaryAggregator.setOnCost(onCost);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg-cost",
+          sessionID: "session-1",
+          role: "assistant",
+          time: { created: 1000, completed: 2000 },
+          tokens: {
+            input: 100,
+            output: 50,
+            reasoning: 0,
+            cache: { read: 0, write: 0 },
+          },
+          cost: 0.0123,
+        },
+      },
+    } as unknown as Event);
+
+    expect(onCost).toHaveBeenCalledTimes(1);
+    expect(onCost).toHaveBeenCalledWith(0.0123);
+  });
+
+  it("does not fire onCost when cost is undefined", () => {
+    const onCost = vi.fn();
+    summaryAggregator.setOnCost(onCost);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg-no-cost",
+          sessionID: "session-1",
+          role: "assistant",
+          time: { created: 1000, completed: 2000 },
+          tokens: {
+            input: 100,
+            output: 50,
+            reasoning: 0,
+            cache: { read: 0, write: 0 },
+          },
+        },
+      },
+    } as unknown as Event);
+
+    expect(onCost).not.toHaveBeenCalled();
+  });
+
+  // ── Question and permission flows ─────────────────────────────────────────
+  it("fires onQuestion for question.asked on the current session", async () => {
+    const onQuestion = vi.fn();
+    summaryAggregator.setOnQuestion(onQuestion);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "question.asked",
+      properties: {
+        id: "q-req-1",
+        sessionID: "session-1",
+        questions: [{ id: "q1", text: "Use TypeScript?", type: "boolean" }],
+      },
+    } as unknown as Event);
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(onQuestion).toHaveBeenCalledTimes(1);
+    const [questions, requestId, sessionId] = onQuestion.mock.calls[0];
+    expect(sessionId).toBe("session-1");
+    expect(requestId).toBe("q-req-1");
+    expect(questions).toHaveLength(1);
+    expect(questions[0]).toMatchObject({ id: "q1", text: "Use TypeScript?" });
+  });
+
+  it("ignores question.asked from a non-current session", async () => {
+    const onQuestion = vi.fn();
+    summaryAggregator.setOnQuestion(onQuestion);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "question.asked",
+      properties: {
+        id: "q-other",
+        sessionID: "session-other",
+        questions: [{ id: "q1", text: "Anything?", type: "boolean" }],
+      },
+    } as unknown as Event);
+
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(onQuestion).not.toHaveBeenCalled();
+  });
+
+  it("fires onPermission for permission.asked on the current session", async () => {
+    const onPermission = vi.fn();
+    summaryAggregator.setOnPermission(onPermission);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "permission.asked",
+      properties: {
+        id: "perm-1",
+        sessionID: "session-1",
+        permission: "fileSystem.write",
+        patterns: ["/src/**"],
+        reason: "Needs to write tests",
+      },
+    } as unknown as Event);
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(onPermission).toHaveBeenCalledTimes(1);
+    expect(onPermission.mock.calls[0][0]).toMatchObject({
+      id: "perm-1",
+      sessionID: "session-1",
+      permission: "fileSystem.write",
+    });
+  });
+
+  it("ignores permission.asked from a non-current session", async () => {
+    const onPermission = vi.fn();
+    summaryAggregator.setOnPermission(onPermission);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "permission.asked",
+      properties: {
+        id: "perm-other",
+        sessionID: "session-other",
+        permission: "fileSystem.write",
+        patterns: [],
+        reason: "",
+      },
+    } as unknown as Event);
+
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(onPermission).not.toHaveBeenCalled();
+  });
+
+  // ── Session compacted ─────────────────────────────────────────────────────
+  it("fires onSessionCompacted with the current project worktree", async () => {
+    const onCompacted = vi.fn();
+    summaryAggregator.setOnSessionCompacted(onCompacted);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "session.compacted",
+      properties: { sessionID: "session-1" },
+    } as unknown as Event);
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(onCompacted).toHaveBeenCalledTimes(1);
+    expect(onCompacted).toHaveBeenCalledWith("session-1", "D:/repo");
+  });
+
+  it("does not fire onSessionCompacted when no project is available", async () => {
+    const onCompacted = vi.fn();
+    summaryAggregator.setOnSessionCompacted(onCompacted);
+    mocked.getCurrentProjectMock.mockReturnValue(undefined);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "session.compacted",
+      properties: { sessionID: "session-1" },
+    } as unknown as Event);
+
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(onCompacted).not.toHaveBeenCalled();
+  });
+
+  // ── Session diff ──────────────────────────────────────────────────────────
+  it("fires onSessionDiff mapping each diff entry to a FileChange", async () => {
+    const onDiff = vi.fn();
+    summaryAggregator.setOnSessionDiff(onDiff);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "session.diff",
+      properties: {
+        sessionID: "session-1",
+        diff: [
+          { file: "src/a.ts", additions: 5, deletions: 1 },
+          { file: "src/b.ts", additions: 0, deletions: 3 },
+        ],
+      },
+    } as unknown as Event);
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(onDiff).toHaveBeenCalledTimes(1);
+    const [sessionId, diffs] = onDiff.mock.calls[0];
+    expect(sessionId).toBe("session-1");
+    expect(diffs).toEqual([
+      { file: "src/a.ts", additions: 5, deletions: 1 },
+      { file: "src/b.ts", additions: 0, deletions: 3 },
+    ]);
+  });
+
+  // ── Tool dedup ────────────────────────────────────────────────────────────
+  it("emits onTool exactly once when the same completed tool event arrives twice", () => {
+    const onTool = vi.fn();
+    summaryAggregator.setOnTool(onTool);
+    summaryAggregator.setSession("session-1");
+
+    summaryAggregator.processEvent({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg-dedup",
+          sessionID: "session-1",
+          role: "assistant",
+          time: { created: Date.now() },
+        },
+      },
+    } as unknown as Event);
+
+    const toolEvent = {
+      type: "message.part.updated",
+      properties: {
+        part: {
+          id: "part-dedup",
+          sessionID: "session-1",
+          messageID: "msg-dedup",
+          type: "tool",
+          callID: "call-dedup",
+          tool: "bash",
+          state: {
+            status: "completed",
+            input: { command: "echo hi" },
+            metadata: {},
+          },
+        },
+      },
+    } as unknown as Event;
+
+    summaryAggregator.processEvent(toolEvent);
+    summaryAggregator.processEvent(toolEvent);
+
+    expect(onTool).toHaveBeenCalledTimes(1);
+    expect(onTool.mock.calls[0][0]).toMatchObject({
+      sessionId: "session-1",
+      callId: "call-dedup",
+      tool: "bash",
+    });
+  });
 });
