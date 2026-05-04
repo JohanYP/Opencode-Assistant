@@ -251,8 +251,8 @@ assistant says it doesn't know.
 3. **Duplicates accumulating.** `addFact` deduplicates exact
    `(content, category)` matches. If category was set differently
    each time, you'll see multiple entries for the same content.
-   Clean with `/memory_search azul` then `/memory_remove <id>` for the
-   stale ones.
+   Clean with `/memory_search <substring>` then `/memory_remove <id>`
+   for the stale ones.
 
 ---
 

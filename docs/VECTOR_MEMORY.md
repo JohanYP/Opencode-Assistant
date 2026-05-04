@@ -1,8 +1,8 @@
 # Vector memory
 
 Optional. Adds semantic search over the `facts` table so the assistant
-can recall a fact like "I prefer light blue" when asked "what colour do
-I like?" — even though the wording doesn't overlap.
+can find a fact stored in one wording when you query it with totally
+different words — paraphrases, synonyms, even different languages.
 
 When disabled (the default), `fact_search` falls back to plain `LIKE`
 substring matching. Everything else works the same.
