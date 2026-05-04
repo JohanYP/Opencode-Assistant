@@ -104,4 +104,51 @@ describe("memory/repositories/facts", () => {
     addFact({ content: "b" });
     expect(countFacts()).toBe(2);
   });
+
+  describe("de-duplication on addFact", () => {
+    it("returns the existing fact when content+category match exactly", () => {
+      const first = addFact({ content: "me gusta el azul", category: "preference" });
+      const second = addFact({ content: "me gusta el azul", category: "preference" });
+
+      expect(second.id).toBe(first.id);
+      expect(countFacts()).toBe(1);
+    });
+
+    it("dedupes when both rows have a NULL category", () => {
+      const first = addFact({ content: "uses Vim" });
+      const second = addFact({ content: "uses Vim" });
+
+      expect(second.id).toBe(first.id);
+      expect(countFacts()).toBe(1);
+    });
+
+    it("keeps same content with different category as separate facts", () => {
+      const a = addFact({ content: "rust is great", category: "lang" });
+      const b = addFact({ content: "rust is great", category: "preference" });
+
+      expect(a.id).not.toBe(b.id);
+      expect(countFacts()).toBe(2);
+    });
+
+    it("does not match a NULL-category existing row when adding with category", () => {
+      const a = addFact({ content: "loves typescript" });
+      const b = addFact({ content: "loves typescript", category: "preference" });
+
+      expect(a.id).not.toBe(b.id);
+      expect(countFacts()).toBe(2);
+    });
+
+    it("trims surrounding whitespace before checking duplicates", () => {
+      const first = addFact({ content: "fact" });
+      const second = addFact({ content: "  fact  " });
+
+      // Note: dedup compares trimmed input vs stored content. Stored
+      // content is the original (unTrimmed) — so the actual behavior
+      // depends on how the original was stored. Verify de-dup prefers
+      // the existing row when trimmed input matches stored content.
+      // Here both "fact" and trimmed "  fact  " trim to "fact".
+      expect(second.id).toBe(first.id);
+      expect(countFacts()).toBe(1);
+    });
+  });
 });

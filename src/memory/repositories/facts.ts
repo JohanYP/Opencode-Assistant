@@ -35,6 +35,33 @@ const SELECT_COLUMNS = `
 
 export function addFact(input: AddFactInput): Fact {
   const db = getDb();
+
+  // Defensive de-duplication on the (content, category) tuple. Without
+  // this, a model re-prompting for "what color do I like?" across
+  // sessions could accumulate "me gusta el azul" entries indefinitely.
+  // Same content with a different category is intentionally NOT a
+  // duplicate — different categorization is a deliberate distinction.
+  const trimmed = input.content.trim();
+  if (trimmed) {
+    const existing = (
+      input.category == null
+        ? (db
+            .prepare(
+              `SELECT ${SELECT_COLUMNS} FROM facts WHERE content = ? AND category IS NULL ORDER BY id DESC LIMIT 1`,
+            )
+            .get(trimmed) as FactRow | undefined)
+        : (db
+            .prepare(
+              `SELECT ${SELECT_COLUMNS} FROM facts WHERE content = ? AND category = ? ORDER BY id DESC LIMIT 1`,
+            )
+            .get(trimmed, input.category) as FactRow | undefined)
+    );
+
+    if (existing) {
+      return existing;
+    }
+  }
+
   const now = new Date().toISOString();
   const result = db
     .prepare(

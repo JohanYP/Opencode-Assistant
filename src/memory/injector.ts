@@ -1,10 +1,16 @@
 import { logger } from "../utils/logger.js";
 import { getDocument } from "./repositories/documents.js";
+import { getRecentFacts } from "./repositories/facts.js";
 import { listSkills } from "./repositories/skills.js";
 import {
   isSessionInitialized,
   markSessionInitialized,
 } from "./session-tracker.js";
+
+// Cap how many recent facts get inlined into a fresh session's system
+// prompt. 20 covers the common case (user preferences, current projects,
+// recent reminders) while staying under ~2 KB of prompt overhead.
+const INLINE_RECENT_FACTS_LIMIT = 20;
 
 const MEMORY_INJECT_ENABLED = process.env.MEMORY_INJECT_ENABLED !== "false";
 
@@ -44,6 +50,28 @@ async function buildFirstMessageContext(): Promise<string> {
       })
       .join("\n");
     parts.push(`<skills_available>\n${skillLines}\n</skills_available>`);
+  }
+
+  // Inline the most recent facts so the model has user-specific context
+  // without needing to remember to call fact_search / fact_recent first.
+  // Models are unreliable about proactive tool use; injecting the recent
+  // tail makes preferences/reminders/project notes visible by default,
+  // and the MCP tools remain available for deeper queries.
+  const recentFacts = getRecentFacts(INLINE_RECENT_FACTS_LIMIT);
+  if (recentFacts.length > 0) {
+    const factLines = recentFacts
+      .map((f) => {
+        const tag = f.category ? `[${f.category}] ` : "";
+        return `- (#${f.id}) ${tag}${f.content}`;
+      })
+      .join("\n");
+    parts.push(
+      `<known_facts_about_user>\n` +
+        `These are the ${recentFacts.length} most recently saved facts. ` +
+        `Trust them as already-known context. Use fact_search() for older / more specific queries.\n` +
+        factLines +
+        `\n</known_facts_about_user>`,
+    );
   }
 
   const summary = getDocument("session-summary");
