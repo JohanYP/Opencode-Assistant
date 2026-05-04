@@ -1,0 +1,26 @@
+# OpenCode server image, built locally from the public npm package.
+#
+# Replaces the previous `image: ghcr.io/sst/opencode:latest` reference,
+# which was inherited from the upstream compose file but does not exist
+# at that path on the public registry. Building from npm gives us a
+# predictable image with no registry-auth surprises.
+
+FROM node:22-alpine
+
+# Tools OpenCode frequently shells out to while serving a workspace.
+RUN apk add --no-cache git openssh-client bash curl ca-certificates
+
+# Install the OpenCode CLI globally.
+RUN npm install -g opencode-ai@latest
+
+# Default workspace + persistent config locations. Both are mounted as
+# volumes from docker-compose.yml so they survive container restarts.
+RUN mkdir -p /workspace /root/.config/opencode
+WORKDIR /workspace
+
+EXPOSE 4096
+
+# Bind to 0.0.0.0 so the bot container can reach the server through the
+# compose network. The bot reads OPENCODE_API_URL=http://opencode:4096
+# from .env and connects there.
+CMD ["opencode", "serve", "--hostname", "0.0.0.0", "--port", "4096"]

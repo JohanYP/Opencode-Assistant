@@ -1,7 +1,8 @@
 services:
   opencode:
-    image: ghcr.io/sst/opencode:latest
-    command: serve --port 4096
+    build:
+      context: .
+      dockerfile: Dockerfile.opencode
     volumes:
       - ./memory:/workspace/memory
       - opencode-config:/root/.config/opencode
