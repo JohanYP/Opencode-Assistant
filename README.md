@@ -2,7 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
-[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
+[![npm](https://img.shields.io/npm/v/opencode-assistant?label=npm)](https://www.npmjs.com/package/opencode-assistant)
+[![Docker](https://img.shields.io/badge/Docker-ghcr.io-2496ED?logo=docker&logoColor=white)](https://github.com/JohanYP/Opencode-Assistant/pkgs/container/opencode-assistant)
 [![OpenCode](https://img.shields.io/badge/Powered%20by-OpenCode-black)](https://opencode.ai)
 [![OpenClaw Skills](https://img.shields.io/badge/OpenClaw-Skills%20compatible-orange)](https://github.com/topics/openclaw-skills)
 [![SQLite memory](https://img.shields.io/badge/Memory-SQLite%20%2B%20MCP-blue)](docs/MCP_INTEGRATION.md)
@@ -37,6 +38,7 @@ session — not just receive a snapshot at session start.
 - [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — first 5 minutes after install
 - [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — how the memory tools wire into OpenCode
 - [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — symptom-to-fix lookup
+- [`docs/RELEASE_CHECKLIST.md`](./docs/RELEASE_CHECKLIST.md) — maintainer release flow
 - [`PRODUCT.md`](./PRODUCT.md#roadmap) and [`CONCEPT.md`](./CONCEPT.md) — direction and boundaries
 
 ---
