@@ -4,10 +4,19 @@ import path from "node:path";
 import yaml from "js-yaml";
 import { logger } from "../utils/logger.js";
 import { getDb } from "./db.js";
-import { setDocument, type DocumentName } from "./repositories/documents.js";
+import { getDocument, setDocument, type DocumentName } from "./repositories/documents.js";
 import { addFact } from "./repositories/facts.js";
 import { installSkill } from "./repositories/skills.js";
 import { appendAudit } from "./repositories/audit.js";
+
+/**
+ * Documents whose source of truth stays the user's markdown file.
+ * They define identity (soul) and agent-selection rules (agents) — both
+ * are intended to be human-edited and version-controlled, so the file
+ * version always wins. Mutations through MCP/bot commands are explicitly
+ * blocked for these names elsewhere.
+ */
+const FILE_TRACKED_DOCUMENTS: DocumentName[] = ["soul", "agents"];
 
 const BACKUP_DIRNAME = ".pre-sqlite-backup";
 const SOURCE_DOCUMENTS: DocumentName[] = ["soul", "agents", "context", "session-summary"];
@@ -27,6 +36,11 @@ export interface MigrationResult {
   importedSkills: number;
   importedScheduledTasks: number;
   backupPath: string | null;
+}
+
+export interface SyncIdentityResult {
+  /** Names of documents whose SQLite row was overwritten from the file. */
+  updated: DocumentName[];
 }
 
 /**
@@ -85,6 +99,49 @@ export async function migrateFromFiles(): Promise<MigrationResult> {
     importedScheduledTasks,
     backupPath,
   };
+}
+
+/**
+ * Re-imports the file-tracked documents (soul, agents) from disk into
+ * SQLite when the on-disk content differs from the SQLite row. Called
+ * on every bot startup AFTER `migrateFromFiles` so user edits to
+ * memory/soul.md or memory/agents.md propagate without forcing the
+ * user to drop the database.
+ *
+ * Mutable documents (context, session-summary) and the facts table
+ * are NEVER touched — those have SQLite as the source of truth and
+ * resyncing them from file would clobber data the user added through
+ * the bot or OpenCode tools.
+ */
+export async function syncIdentityDocumentsFromFiles(): Promise<SyncIdentityResult> {
+  const memoryDir = process.env.MEMORY_DIR ?? "./memory";
+  const updated: DocumentName[] = [];
+
+  for (const name of FILE_TRACKED_DOCUMENTS) {
+    const filePath = path.resolve(memoryDir, `${name}.md`);
+    if (!existsSync(filePath)) continue;
+
+    const fileContent = await fs.readFile(filePath, "utf-8");
+    if (!fileContent.trim()) continue;
+
+    const current = getDocument(name);
+    if (current && current.content === fileContent) continue;
+
+    setDocument(name, fileContent);
+    updated.push(name);
+    logger.info(
+      `[Memory/Sync] ${name} document refreshed from ${filePath} (${fileContent.length} chars)`,
+    );
+  }
+
+  if (updated.length > 0) {
+    appendAudit("document_updated", {
+      source: "file_sync_on_startup",
+      names: updated,
+    });
+  }
+
+  return { updated };
 }
 
 function isDbAlreadyPopulated(db: ReturnType<typeof getDb>): boolean {

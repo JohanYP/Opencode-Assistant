@@ -7,8 +7,9 @@ import {
   migrateFromFiles,
   parseBulletFacts,
   parseSkillFrontmatterShallow,
+  syncIdentityDocumentsFromFiles,
 } from "../../src/memory/migrate-from-files.js";
-import { listDocuments } from "../../src/memory/repositories/documents.js";
+import { getDocument, listDocuments, setDocument } from "../../src/memory/repositories/documents.js";
 import { countFacts, getRecentFacts } from "../../src/memory/repositories/facts.js";
 import { listSkills } from "../../src/memory/repositories/skills.js";
 import { getAudit } from "../../src/memory/repositories/audit.js";
@@ -244,6 +245,89 @@ describe("memory/migrate-from-files", () => {
       expect(audit).toHaveLength(1);
       const payload = audit[0].payload as Record<string, unknown>;
       expect(payload.facts).toBe(1);
+    });
+  });
+
+  describe("syncIdentityDocumentsFromFiles", () => {
+    it("does nothing when the file content matches the SQLite row", async () => {
+      writeFile("soul.md", "I am the assistant.");
+      await migrateFromFiles();
+
+      const before = getDocument("soul")?.updatedAt;
+      const result = await syncIdentityDocumentsFromFiles();
+      const after = getDocument("soul")?.updatedAt;
+
+      expect(result.updated).toEqual([]);
+      expect(after).toBe(before);
+    });
+
+    it("rewrites the SQLite row when the file content differs", async () => {
+      writeFile("soul.md", "old content");
+      await migrateFromFiles();
+      expect(getDocument("soul")?.content).toBe("old content");
+
+      writeFile("soul.md", "new content with MCP instructions");
+      const result = await syncIdentityDocumentsFromFiles();
+
+      expect(result.updated).toEqual(["soul"]);
+      expect(getDocument("soul")?.content).toBe("new content with MCP instructions");
+    });
+
+    it("syncs both soul and agents when both differ", async () => {
+      writeFile("soul.md", "soul-v1");
+      writeFile("agents.md", "agents-v1");
+      await migrateFromFiles();
+
+      writeFile("soul.md", "soul-v2");
+      writeFile("agents.md", "agents-v2");
+      const result = await syncIdentityDocumentsFromFiles();
+
+      expect(result.updated.sort()).toEqual(["agents", "soul"]);
+      expect(getDocument("soul")?.content).toBe("soul-v2");
+      expect(getDocument("agents")?.content).toBe("agents-v2");
+    });
+
+    it("does not touch context or session-summary even if the files change", async () => {
+      writeFile("context.md", "imported context");
+      writeFile("session-summary.md", "imported summary");
+      await migrateFromFiles();
+
+      // Simulate a runtime mutation (OpenCode wrote via memory_write):
+      setDocument("context", "live context from MCP");
+      setDocument("session-summary", "live summary from MCP");
+
+      // The user later edits the .md files on disk — those edits MUST
+      // NOT clobber the live data.
+      writeFile("context.md", "stale file edit");
+      writeFile("session-summary.md", "stale file edit");
+
+      const result = await syncIdentityDocumentsFromFiles();
+      expect(result.updated).toEqual([]);
+      expect(getDocument("context")?.content).toBe("live context from MCP");
+      expect(getDocument("session-summary")?.content).toBe("live summary from MCP");
+    });
+
+    it("skips a missing file (no row created)", async () => {
+      // No soul.md or agents.md on disk.
+      const result = await syncIdentityDocumentsFromFiles();
+      expect(result.updated).toEqual([]);
+      expect(getDocument("soul")).toBeNull();
+      expect(getDocument("agents")).toBeNull();
+    });
+
+    it("appends an audit entry when documents are refreshed", async () => {
+      writeFile("soul.md", "v1");
+      await migrateFromFiles();
+
+      writeFile("soul.md", "v2");
+      await syncIdentityDocumentsFromFiles();
+
+      const audit = getAudit({ event: "document_updated" });
+      const fileSyncEntries = audit.filter((entry) => {
+        const payload = entry.payload as Record<string, unknown>;
+        return payload.source === "file_sync_on_startup";
+      });
+      expect(fileSyncEntries).toHaveLength(1);
     });
   });
 });

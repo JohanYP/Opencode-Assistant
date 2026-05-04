@@ -11,7 +11,7 @@ import { startCronYmlSync, stopCronYmlSync } from "../cron/yml-sync.js";
 import { warmupSessionDirectoryCache } from "../session/cache-manager.js";
 import { reconcileStoredModelSelection } from "../model/manager.js";
 import { startMemorySummaryWatcher, stopMemorySummaryWatcher } from "../memory/watcher.js";
-import { migrateFromFiles } from "../memory/migrate-from-files.js";
+import { migrateFromFiles, syncIdentityDocumentsFromFiles } from "../memory/migrate-from-files.js";
 import { closeDb } from "../memory/db.js";
 import { startMcpHttpServer, type McpHttpServerHandle } from "../mcp/http-server.js";
 import { getRuntimeMode } from "../runtime/mode.js";
@@ -70,6 +70,22 @@ export async function startBotApp(): Promise<void> {
     }
   } catch (error) {
     logger.error("[App] Memory migration failed; continuing with markdown sources:", error);
+  }
+
+  // Re-sync the identity documents (soul, agents) from disk on every
+  // startup, since those files are intended to be human-edited and
+  // version-controlled. This makes \`git pull\` of an updated soul.md
+  // actually take effect after a restart instead of silently being
+  // shadowed by the older SQLite copy.
+  try {
+    const sync = await syncIdentityDocumentsFromFiles();
+    if (sync.updated.length > 0) {
+      logger.info(
+        `[App] Refreshed identity documents from files: ${sync.updated.join(", ")}`,
+      );
+    }
+  } catch (error) {
+    logger.error("[App] Failed to sync identity documents from files:", error);
   }
 
   // Start the MCP HTTP server so OpenCode (in its own container on the
