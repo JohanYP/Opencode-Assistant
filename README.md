@@ -111,7 +111,7 @@ Beyond the basic scheduled tasks, three cron types are supported via `memory/cro
 An interactive `setup.sh` script guides you through the full configuration in 10 steps — no manual `.env` editing needed.
 
 ### Single Install Path: Docker
-Everything runs in Docker — bot and OpenCode together. Updates are a one-liner: `git pull && docker compose up -d --build`. No systemd, no launchd, no `host.docker.internal`.
+Everything runs in Docker — bot and OpenCode together. Updates are a one-liner: `git pull && docker compose up -d --build`. No systemd, no launchd, no manual networking. The bot can also reach optional services on the host (e.g. Ollama for vector memory) via `host.docker.internal` out of the box.
 
 ---
 

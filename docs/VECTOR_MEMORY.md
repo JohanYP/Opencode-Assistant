@@ -24,25 +24,58 @@ substring matching. Everything else works the same.
    (fire-and-forget). If the provider is down, the fact is still saved;
    re-embed it later with `/memory_reembed`.
 
-## Setup A — Ollama (local, no API key)
+## Setup A — Ollama on the host (recommended, no API key)
 
 Best for self-hosted setups. Embeddings never leave your machine.
+The `docker-compose.yml` already maps `host.docker.internal` to your
+host, so the bot inside Docker can reach Ollama out of the box —
+**you don't need to edit the compose file**.
+
+### 1. Install Ollama on the host (VPS / your machine)
 
 ```bash
-# 1. Install Ollama (https://ollama.com)
 curl -fsSL https://ollama.com/install.sh | sh
-
-# 2. Pull a small embedding model (~270 MB, runs on CPU)
-ollama pull nomic-embed-text
-
-# 3. Make sure Ollama is reachable from inside the bot container.
-#    On Linux Docker hosts, `host.docker.internal` works since Docker 20.10
-#    when the compose file has `extra_hosts: ["host.docker.internal:host-gateway"]`
-#    (already configured in our docker-compose.yml).
-ollama serve   # listens on :11434 by default
 ```
 
-Then in `.env`:
+Linux distributions register it as a systemd service automatically.
+
+### 2. Make Ollama listen on all interfaces (so Docker can reach it)
+
+By default Ollama binds to `127.0.0.1`, which is unreachable from
+inside containers. Bind it to `0.0.0.0`:
+
+```bash
+sudo systemctl edit ollama
+```
+
+In the editor that opens, paste:
+
+```ini
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0:11434"
+```
+
+Then reload and restart:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+> **Security note:** `0.0.0.0` opens the port on every interface. If
+> your VPS is exposed to the internet, block public access:
+> `sudo ufw deny 11434/tcp` (or the firewalld equivalent). Docker
+> still reaches it locally because containers share the host kernel.
+
+### 3. Pull the embedding model (~270 MB, runs on CPU)
+
+```bash
+ollama pull nomic-embed-text
+```
+
+### 4. Tell the bot about it
+
+In `.env`:
 
 ```env
 EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1
@@ -50,13 +83,14 @@ EMBEDDING_MODEL=nomic-embed-text
 EMBEDDING_API_KEY=
 ```
 
-Restart the bot:
+### 5. Restart and validate
 
 ```bash
 docker compose restart bot
+docker compose logs bot 2>&1 | grep -i embedding
 ```
 
-In the bot logs you should see:
+You should see:
 
 ```
 [Memory/Embedding] Driver enabled (model=nomic-embed-text, base=http://host.docker.internal:11434/v1, dims≈768)

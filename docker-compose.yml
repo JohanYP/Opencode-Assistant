@@ -23,6 +23,12 @@ services:
       - ./memory:/app/memory
       - bot-data:/app/data
     env_file: .env
+    # Lets the bot reach services running on the VPS host (e.g. an
+    # Ollama install for the optional vector memory). Harmless when
+    # unused — it only adds a /etc/hosts alias inside the container.
+    # Requires Docker 20.10+ (released 2020-12).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # MCP HTTP server is exposed only on the compose network (no host port
     # mapping). OpenCode reaches it at http://bot:4097/mcp.
     expose:
