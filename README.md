@@ -1,472 +1,533 @@
-# Opencode Personal Assistant
+# Opencode-Assistant
+
+> 🤖 **Self-hosted personal AI assistant on Telegram** — powered by [OpenCode](https://opencode.ai) and the free Claude Sonnet model. [OpenClaw](https://github.com/topics/openclaw-skills) skills compatible · SQLite + MCP live memory · optional vector memory with [Ollama](https://ollama.com).
+
+> 🤖 **Asistente personal de IA en Telegram, auto-alojado** — impulsado por [OpenCode](https://opencode.ai) y el modelo Claude Sonnet gratis. Compatible con skills de [OpenClaw](https://github.com/topics/openclaw-skills) · memoria viva SQLite + MCP · memoria vectorial opcional con [Ollama](https://ollama.com).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![npm](https://img.shields.io/npm/v/opencode-assistant?label=npm)](https://www.npmjs.com/package/opencode-assistant)
 [![Docker](https://img.shields.io/badge/Docker-ghcr.io-2496ED?logo=docker&logoColor=white)](https://github.com/JohanYP/Opencode-Assistant/pkgs/container/opencode-assistant)
 [![OpenCode](https://img.shields.io/badge/Powered%20by-OpenCode-black)](https://opencode.ai)
-[![OpenClaw Skills](https://img.shields.io/badge/OpenClaw-Skills%20compatible-orange)](https://github.com/topics/openclaw-skills)
-[![SQLite memory](https://img.shields.io/badge/Memory-SQLite%20%2B%20MCP-blue)](docs/MCP_INTEGRATION.md)
+[![OpenClaw](https://img.shields.io/badge/OpenClaw-Skills%20compatible-orange)](https://github.com/topics/openclaw-skills)
+[![MCP](https://img.shields.io/badge/MCP-server%20%2B%20client-green)](https://modelcontextprotocol.io)
+[![Vector memory](https://img.shields.io/badge/Vector%20memory-Ollama%20%2F%20OpenAI-blue)](docs/VECTOR_MEMORY.md)
 
-A fully-featured **personal AI assistant** running in Telegram, powered by [OpenCode](https://opencode.ai) and the free `big-pickle` model (Claude Sonnet). No subscriptions, no API costs — completely free to run.
+Talk to your personal coding/research assistant from your phone, with persistent cross-session memory, voice replies, scheduled tasks, and the same OpenClaw `SKILL.md` ecosystem as Claude Desktop. Everything runs in Docker on your machine or VPS — no subscriptions, no API costs (the default `big-pickle` model is free).
 
-Persistent memory across sessions, scheduled tasks with continue/cancel buttons that inject results into your active chat, voice replies, and one-command MCP server installation. Deploy in minutes with a single guided setup script. Everything runs locally on your machine or server.
+Habla con tu asistente personal de programación/investigación desde el celular, con memoria persistente entre sesiones, respuestas por voz, tareas programadas y el mismo ecosistema de skills `SKILL.md` de OpenClaw que usa Claude Desktop. Todo corre en Docker en tu equipo o VPS — sin suscripciones, sin costos de API (el modelo `big-pickle` por defecto es gratis).
 
-## Architecture at a glance
+---
+
+## Architecture / Arquitectura
 
 ```
 ┌──────────────┐                ┌────────────────────────────┐
-│ Telegram     │  Bot API       │       bot container        │
-│ (your phone) │ <───────────►  │  grammY · MCP HTTP :4097   │
+│  Telegram    │  Bot API       │       bot container        │
+│  (mobile)    │ ◀────────────▶ │  grammY · MCP HTTP :4097   │
 └──────────────┘                │  SQLite memory (data.db)   │
                                 └─────────────┬──────────────┘
-                                              │ HTTP /mcp
+                                              │ HTTP /mcp (memory tools)
                                               ▼
                                 ┌────────────────────────────┐
                                 │     opencode container     │
                                 │  opencode serve :4096      │
-                                │  big-pickle / Claude       │
-                                └────────────────────────────┘
+                                │  big-pickle (Claude Sonnet)│
+                                └─────────────┬──────────────┘
+                                              │ optional /v1/embeddings
+                                              ▼
+                              ┌──────────────────────────────────┐
+                              │  Ollama (host) or OpenAI (cloud) │
+                              │  embeddings for vector memory    │
+                              └──────────────────────────────────┘
 ```
 
-Everything runs in Docker (one `docker compose up -d`). The bot owns the
-SQLite memory and exposes it to OpenCode through a local MCP server, so
-the assistant can read **and write** memory at any point during a
-session — not just receive a snapshot at session start.
-
-**Quick links:**
-- [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — first 5 minutes after install
-- [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — how the memory tools wire into OpenCode
-- [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md) — optional semantic search over facts
-- [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — symptom-to-fix lookup
-- [`docs/RELEASE_CHECKLIST.md`](./docs/RELEASE_CHECKLIST.md) — maintainer release flow
-- [`PRODUCT.md`](./PRODUCT.md#roadmap) and [`CONCEPT.md`](./CONCEPT.md) — direction and boundaries
+The bot owns SQLite memory and exposes it to OpenCode via a local MCP server, so the assistant can read **and write** memory at any point during a session — not just receive a snapshot at session start. With an optional embedding provider configured, `fact_search` ranks results by semantic similarity instead of plain LIKE matching.
 
 ---
 
-## Highlights
+# 🇬🇧 English
 
-### Persistent Memory System
-The assistant remembers who it is and what you've discussed across sessions. At the start of every new session it automatically receives its identity (`soul.md`), available skills, and a summary of the previous session — so it continues right where you left off, without you repeating context.
+## What is this?
 
-- **`memory/soul.md`** — personality, behavior rules, and skills index (read-only, you edit it)
-- **`memory/memory.md`** — long-term facts and user preferences (read/write)
-- **`memory/context.md`** — current project context (read/write)
-- **`memory/agents.md`** — agent selection instructions (read/write)
-- **`memory/session-summary.md`** — auto-updated summary of the last session (incremental, survives context overflow)
-- **`memory/skills/`** — one `.md` file per skill
+`Opencode-Assistant` is a Telegram bot that turns [**OpenCode**](https://opencode.ai) into a mobile-first personal AI assistant. You get:
 
-### Vector Memory (optional)
-For semantic search over your saved facts — so "what colour do I like?" finds "I prefer light blue" — set `EMBEDDING_BASE_URL` in `.env`. The bot embeds facts on write and ranks `fact_search` by cosine similarity. Default off; falls back to plain `LIKE` substring search.
+- 🧠 **Persistent memory** — facts, preferences, project context, session summaries, all stored in SQLite and live-queryable via MCP tools
+- 🔍 **Optional semantic search** — embed your facts with [Ollama](https://ollama.com) (local, free) or OpenAI/Groq/Together (cloud), so the assistant finds *"I prefer light blue"* when you ask *"what colour do I like?"*
+- 🪄 **OpenClaw SKILL.md compatibility** — drop any `SKILL.md` from the [openclaw-skills](https://github.com/topics/openclaw-skills) ecosystem and it works
+- ⏰ **Scheduled tasks** — three types (run an OpenCode session, send a reminder, back up memory)
+- 🎙️ **Voice in/out** — Whisper STT + Speechify/OpenAI/Edge TTS, sent as Telegram voice notes
+- 🔒 **Single-user, self-hosted** — strict whitelist; your data, your VPS
+- 🌍 **Localized in 6 languages** — en / es / de / fr / ru / zh
 
-Two recommended setups:
+## Why use it?
 
-```env
-# Local, no API key, fully self-hosted (requires Ollama on host):
+If you already use OpenCode on your laptop, this is the same agent on your phone, with cross-session memory and skills. If you've used Claude Desktop / OpenClaw runtime, this is the self-hosted, free, mobile-friendly version with the same skill format.
+
+## Requirements
+
+### Minimum (without vector memory)
+- 1 GB RAM, 5 GB disk
+- Docker 20.10+ with Compose v2
+- A Telegram account
+- A bot token from [@BotFather](https://t.me/BotFather)
+- Your numeric Telegram user ID from [@userinfobot](https://t.me/userinfobot)
+
+### Recommended (with Ollama vector memory)
+- 2 GB RAM, 7 GB disk
+- Same Docker requirements
+- [Ollama](https://ollama.com) installed on the host (Linux: native package; macOS/Windows: Ollama Desktop)
+- ~270 MB extra disk for the `nomic-embed-text` embedding model
+- No GPU needed — embeddings run fast on CPU
+
+## Quick install — Linux (Ubuntu/Debian/Fedora/Arch)
+
+```bash
+# 1. Clone
+git clone https://github.com/JohanYP/Opencode-Assistant.git
+cd Opencode-Assistant
+
+# 2. Install Docker if you don't have it
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER && newgrp docker
+
+# 3. Run the guided setup wizard
+./setup.sh
+```
+
+The wizard asks for:
+1. Bot language (en/es/de/fr/ru/zh)
+2. Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
+3. Your Telegram User ID (from [@userinfobot](https://t.me/userinfobot))
+4. AI model (`big-pickle` free by default — Claude Sonnet)
+5. TTS provider (Speechify recommended — 50K chars/month free)
+6. STT provider (Groq Whisper recommended — generous free tier)
+7. Timezone (auto-detected)
+8. Assistant personality (name, tone, instructions)
+9. Interface options
+10. Optional OpenClaw skills to install from GitHub
+
+At the end it generates `.env`, all memory files, and launches Docker automatically. Open Telegram, talk to your bot. Done.
+
+### Manual install (no wizard)
+
+```bash
+git clone https://github.com/JohanYP/Opencode-Assistant.git
+cd Opencode-Assistant
+cp .env.example .env
+# Edit .env: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USER_ID
+docker compose up -d
+docker compose logs -f bot
+```
+
+## Quick install — Windows (Git Bash)
+
+> All commands use Git Bash (not CMD/PowerShell). Install Git for Windows first if you don't have it: https://git-scm.com/download/win.
+
+```bash
+# 1. Install Docker Desktop for Windows
+# Download from https://docs.docker.com/desktop/install/windows-install/
+# Make sure WSL 2 backend is enabled (default since 2022).
+
+# 2. In Git Bash:
+git clone https://github.com/JohanYP/Opencode-Assistant.git
+cd Opencode-Assistant
+./setup.sh
+
+# 3. If setup.sh fails on Windows (some bash features differ),
+#    use the manual flow:
+cp .env.example .env
+# Edit .env in any editor (Notepad, VS Code, ...)
+docker compose up -d
+docker compose logs -f bot
+```
+
+> Windows note: `host.docker.internal` already works natively on Docker Desktop, so the optional Ollama setup below works without extra config.
+
+## Optional: vector memory with Ollama (recommended)
+
+Vector memory makes `fact_search` semantic instead of substring-based — *"what colour do I like?"* finds *"I prefer light blue"*. The default install uses LIKE matching; turn vectors on with three steps.
+
+### Linux
+
+```bash
+# 1. Install Ollama on the host (not inside the bot container)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# 2. Make Ollama listen on all interfaces so Docker can reach it
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+echo '[Service]'                              | sudo tee /etc/systemd/system/ollama.service.d/override.conf
+echo 'Environment="OLLAMA_HOST=0.0.0.0:11434"' | sudo tee -a /etc/systemd/system/ollama.service.d/override.conf
+sudo systemctl daemon-reload && sudo systemctl restart ollama
+
+# 3. Block 11434 from the public internet (security)
+sudo ufw deny 11434/tcp 2>/dev/null || true
+
+# 4. Pull the embedding model (~270 MB)
+ollama pull nomic-embed-text
+
+# 5. Tell the bot about it (.env)
+cat >> .env <<'EOF'
 EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1
 EMBEDDING_MODEL=nomic-embed-text
+EMBEDDING_API_KEY=
+EOF
 
-# Cloud (OpenAI, Groq, Together, ... — any /v1/embeddings provider):
+# 6. Restart and backfill embeddings for existing facts
+docker compose restart bot
+# In Telegram: /memory_reembed
+```
+
+### Windows (Ollama Desktop)
+
+```bash
+# 1. Download and install Ollama Desktop
+#    https://ollama.com/download/windows
+#    It runs as a system tray app.
+
+# 2. Open PowerShell as admin (one-time, to expose to Docker)
+#    setx OLLAMA_HOST "0.0.0.0:11434"
+#    Then restart Ollama from the tray.
+
+# 3. In Git Bash:
+ollama pull nomic-embed-text
+
+# 4. Edit .env:
+echo "EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1" >> .env
+echo "EMBEDDING_MODEL=nomic-embed-text" >> .env
+echo "EMBEDDING_API_KEY=" >> .env
+
+# 5. Restart bot, backfill in Telegram with /memory_reembed
+docker compose restart bot
+```
+
+### Cloud provider alternative (OpenAI, Groq, ...)
+
+If you'd rather use OpenAI's `text-embedding-3-small` (~$0.0001 per fact) or any other `/v1/embeddings`-compatible API:
+
+```env
 EMBEDDING_BASE_URL=https://api.openai.com/v1
 EMBEDDING_MODEL=text-embedding-3-small
 EMBEDDING_API_KEY=sk-...
 ```
 
-After enabling, run `/memory_reembed` once to backfill embeddings for existing facts. Full guide: [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md).
+Full guide and troubleshooting: [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md).
 
-### OpenClaw Skills Compatibility
-Drop any `SKILL.md` file from the [OpenClaw](https://github.com/topics/openclaw-skills) / [ClawHub](https://github.com/alirezarezvani/claude-skills) ecosystem into `memory/skills/` and the assistant can use it immediately. YAML frontmatter is parsed automatically to show skill names, descriptions, and categories.
-
-Drop any `.md` file into `memory/skills/` and it will be picked up automatically, or install one directly from a GitHub URL:
-
-```
-/skill_install https://raw.githubusercontent.com/alirezarezvani/claude-skills/main/engineering/git-worktree-manager/SKILL.md
-```
-
-### Cron Jobs — Three Types
-Beyond the basic scheduled tasks, three cron types are supported via `memory/cron.yml`:
-
-| Type | Description |
-|---|---|
-| `task` | Creates an OpenCode session and runs a prompt (original behavior) |
-| `reminder` | Sends a direct Telegram message — no tokens consumed |
-| `backup` | Copies all memory files to `memory/backups/YYYY-MM-DD/` |
-
-`memory/cron.yml` is synced bidirectionally with `/task` commands in Telegram.
-
-### TTS Improvements
-- **Speechify** provider added — 50,000 characters/month **free**, very natural voices
-- Audio is sent as a **Telegram voice note** (circular waveform) instead of a file attachment
-- **Single audio per response**: audio is generated only when the full response is complete (`session.idle`), not for every intermediate message
-
-### STT Improvements
-- Option to hide the transcribed text from the chat — the voice is silently sent to the assistant
-
-### Cleaner Interface
-- Thinking messages (`💭 Thinking...`) hidden by default
-- Run footer (`🛠️ Build · 🤖 model · 🕒 Xs`) hidden by default
-- Both can be re-enabled via environment variables
-
-### Guided Setup Wizard
-An interactive `setup.sh` script guides you through the full configuration in 10 steps — no manual `.env` editing needed.
-
-### Single Install Path: Docker
-Everything runs in Docker — bot and OpenCode together. Updates are a one-liner: `git pull && docker compose up -d --build`. No systemd, no launchd, no manual networking. The bot can also reach optional services on the host (e.g. Ollama for vector memory) via `host.docker.internal` out of the box.
-
----
-
-## Quick Start
-
-```bash
-git clone https://github.com/JohanYP/Opencode-Assistant.git
-cd Opencode-Assistant
-./setup.sh
-```
-
-The wizard will ask for:
-1. Bot language (en/es/de/fr/ru/zh)
-2. Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
-3. Your Telegram User ID (from [@userinfobot](https://t.me/userinfobot))
-4. AI model (`big-pickle` free by default)
-5. TTS provider (Speechify recommended — free)
-6. STT provider (Groq Whisper recommended — free)
-7. Timezone (auto-detected)
-8. Assistant personality (name, tone, instructions)
-9. Interface options (thinking messages, footer)
-10. Optional OpenClaw skills to install from GitHub
-
-At the end it generates `.env`, all memory files, and launches Docker automatically.
-
----
-
-## Prerequisites
-
-- **Docker** with Compose v2 — [install](https://docs.docker.com/get-docker/)
-- **Telegram Bot** — created via [@BotFather](https://t.me/BotFather) during setup
-
-No Node.js or OpenCode binary needed on your machine — everything runs inside Docker.
-
----
-
-## Features
-
-### Core
-- **Remote coding** — send prompts to OpenCode from anywhere
-- **Session management** — create, switch, and track sessions
-- **Live status** — pinned message with project, model, context usage
-- **Model switching** — pick from favorites and recent history
-- **Agent modes** — Plan and Build modes
-- **Subagent activity** — live progress of parallel agents
-- **Custom Commands** — run OpenCode slash commands from Telegram
-- **Interactive Q&A** — answer agent questions via inline buttons
-- **Voice prompts** — send voice messages, transcribed via Whisper
-- **File attachments** — images, PDFs, text files
-- **Scheduled tasks** — cron jobs and one-time tasks
-- **Git worktree switching** — `/worktree` command
-- **Security** — strict user ID whitelist
-- **Localization** — en, es, de, fr, ru, zh
-
-### Personal Assistant Layer
-- **Persistent memory** across sessions (soul, memory, context, session summary)
-- **OpenClaw SKILL.md compatibility** — drop a `.md` into `memory/skills/` or install via `/skill_install <url>`
-- **Speechify TTS** — free, natural voices, sent as voice notes
-- **TTS accumulation** — one audio per complete response
-- **STT hide text** — silently transcribe voice without showing text
-- **`type: reminder`** cron — direct Telegram messages, zero tokens
-- **`type: backup`** cron — automatic memory file backups
-- **`memory/cron.yml`** — define cron jobs as a file, synced with `/task`
-- **Hidden thinking + footer** by default for cleaner UX
-
----
-
-## Bot Commands
-
-### Original Commands
-| Command | Description |
-|---|---|
-| `/status` | Server health, project, session, model info |
-| `/new` | Create a new session |
-| `/abort` | Abort current task |
-| `/sessions` | Browse and switch sessions |
-| `/projects` | Switch between OpenCode projects |
-| `/worktree` | Switch git worktrees |
-| `/open` | Add a project by browsing directories |
-| `/tts` | Toggle audio replies |
-| `/rename` | Rename current session |
-| `/commands` | Browse and run custom commands |
-| `/mcps` | Browse and toggle MCP servers |
-| `/task` | Create a scheduled task |
-| `/tasklist` | Browse and delete scheduled tasks |
-| `/opencode_start` | Start the local OpenCode server |
-| `/opencode_stop` | Stop the local OpenCode server |
-| `/help` | Show available commands |
-
-### Personal Assistant Commands
-| Command | Description |
-|---|---|
-| `/soul` | View assistant personality (soul.md) |
-| `/memory [text]` | View or append to long-term memory |
-| `/context [text]` | View or update project context |
-| `/memfiles` | List all memory files with sizes |
-| `/listskill` | List available skills with metadata |
-| `/skill <name>` | View a specific skill |
-| `/skill_install <url>` | Install a skill from a GitHub URL |
-| `/agents_md` | View agent selection instructions |
-
----
-
-## Memory System
-
-```
-memory/
-├── soul.md              ← Your assistant's identity (you edit this)
-├── memory.md            ← Long-term facts and preferences
-├── context.md           ← Current project context
-├── agents.md            ← Agent selection instructions
-├── session-summary.md   ← Auto-updated session summary
-├── cron.yml             ← Scheduled jobs (synced with /task)
-├── skills/
-│   ├── web-search.md
-│   ├── code-review.md
-│   ├── daily-summary.md
-│   └── <any-openclaw-skill>.md
-└── backups/
-    └── YYYY-MM-DD/      ← Automatic backups
-```
-
-### How Memory Works
-
-**First message of a new session:**
-The assistant receives `soul.md` + `agents.md` + skill list + `session-summary.md` prepended to your message. It knows exactly who it is, what skills it has, and what you worked on last.
-
-**Subsequent messages in the same session:**
-OpenCode manages the conversation history internally. No extra context is injected — tokens are conserved.
-
-**Session summary updates:**
-`soul.md` instructs the assistant to update `session-summary.md` incrementally during the session — when you ask it to remember something, when a task completes, or when context usage is high. This way the summary is always up to date even if the session crashes or fills up.
-
----
-
-## Cron Jobs
-
-Define scheduled tasks in `memory/cron.yml` or via `/task` in Telegram. Both are synced bidirectionally.
-
-```yaml
-crons:
-  - id: daily-summary
-    schedule: "0 8 * * *"
-    type: task
-    prompt: "Generate a daily summary using the daily-summary skill"
-    timezone: "America/Bogota"
-
-  - id: morning-reminder
-    schedule: "30 7 * * 1-5"
-    type: reminder
-    message: "Good morning! Check your pending tasks."
-    timezone: "America/Bogota"
-
-  - id: weekly-backup
-    schedule: "0 0 * * 0"
-    type: backup
-    timezone: "America/Bogota"
-```
-
----
-
-## TTS Providers
-
-| Provider | Free | API Key | Notes |
-|---|---|---|---|
-| **Speechify** | 50,000 chars/month | Required (free) | Most natural, recommended |
-| **Edge TTS** | Unlimited | Not required | Microsoft voices, requires local proxy |
-| **OpenAI TTS** | No | Required | |
-| **Google Cloud TTS** | No | Credentials required | |
-| Any OpenAI-compatible | Depends | Required | |
-
-Speechify API key: [api.speechify.ai](https://api.speechify.ai) — free registration.
-
----
-
-## STT Providers
-
-| Provider | Free | Notes |
-|---|---|---|
-| **Groq Whisper** | Generous free tier | Recommended — [console.groq.com](https://console.groq.com) |
-| **OpenAI Whisper** | No | |
-| Any Whisper-compatible | Depends | |
-
----
-
-## Environment Variables
-
-All variables are set automatically by `setup.sh`. Reference for manual configuration:
-
-### Required
-| Variable | Description |
-|---|---|
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
-| `TELEGRAM_ALLOWED_USER_ID` | Your numeric Telegram user ID |
-
-### OpenCode
-| Variable | Default | Description |
-|---|---|---|
-| `OPENCODE_API_URL` | `http://opencode:4096` | Internal compose-network address of the OpenCode container |
-| `OPENCODE_MODEL_PROVIDER` | `opencode` | Model provider |
-| `OPENCODE_MODEL_ID` | `big-pickle` | Model ID (`big-pickle` = Claude Sonnet, free) |
-| `OPENCODE_AUTO_RESTART_ENABLED` | `false` | Auto-restart OpenCode on health check failure |
-
-### Memory
-| Variable | Default | Description |
-|---|---|---|
-| `MEMORY_DIR` | `./memory` | Path to memory directory |
-| `MEMORY_INJECT_ENABLED` | `true` | Inject memory context into new sessions |
-
-### TTS
-| Variable | Default | Description |
-|---|---|---|
-| `TTS_PROVIDER` | — | `speechify`, `openai`, `google`, or empty |
-| `SPEECHIFY_API_KEY` | — | Speechify API key (free tier available) |
-| `TTS_VOICE` | provider-specific | Voice ID |
-| `TTS_WAIT_FOR_IDLE` | `true` | Send one audio after full response |
-| `TTS_API_URL` | — | OpenAI-compatible TTS base URL |
-| `TTS_API_KEY` | — | OpenAI-compatible TTS API key |
-
-### STT
-| Variable | Default | Description |
-|---|---|---|
-| `STT_API_URL` | — | Whisper-compatible API base URL |
-| `STT_API_KEY` | — | STT API key |
-| `STT_MODEL` | `whisper-large-v3-turbo` | STT model name |
-| `STT_HIDE_RECOGNIZED_TEXT` | `false` | Hide transcribed text from chat |
-
-### Interface
-| Variable | Default | Description |
-|---|---|---|
-| `HIDE_THINKING_MESSAGES` | `true` | Hide `💭 Thinking...` messages |
-| `HIDE_ASSISTANT_FOOTER` | `true` | Hide `🛠️ Build · 🤖 model · 🕒 Xs` footer |
-| `HIDE_TOOL_CALL_MESSAGES` | `false` | Hide tool call messages |
-| `BOT_LOCALE` | `en` | Bot UI language (`en`, `es`, `de`, `fr`, `ru`, `zh`) |
-
-### Cron
-| Variable | Default | Description |
-|---|---|---|
-| `CRON_YML_SYNC` | `true` | Sync `memory/cron.yml` with `/task` commands |
-| `CRON_BACKUP_ENABLED` | `true` | Enable automatic memory backups |
-| `CRON_BACKUP_SCHEDULE` | `0 0 * * 0` | Backup cron schedule (default: Sundays) |
-
----
-
-## Installation
-
-Everything runs in Docker. Bot and OpenCode share a compose network.
-
-```bash
-docker compose up -d
-```
-
-To update later:
+## Updating
 
 ```bash
 git pull
 docker compose up -d --build
 ```
 
+That's it. Memory persists in `./memory/` (mounted volume), so updates never lose state.
+
+## Bot commands
+
+### Core
+| Command | Description |
+|---|---|
+| `/status` | Server, project, session, model info |
+| `/new` · `/abort` · `/sessions` | Session management |
+| `/projects` · `/worktree` · `/open` | Project switching |
+| `/tts` · `/rename` · `/help` | Misc |
+| `/task` · `/tasklist` | Scheduled tasks |
+| `/commands` · `/mcps` | OpenCode commands and MCP servers |
+
+### Memory & skills
+| Command | Description |
+|---|---|
+| `/memory <text>` | Save a fact |
+| `/memory_search <query>` | Search saved facts (vector if enabled, LIKE otherwise) |
+| `/memory_remove <id>` | Delete a fact by id |
+| `/memory_export` | Dump everything to markdown files |
+| `/memory_reembed` | Recompute embeddings (run after enabling vectors or switching model) |
+| `/inline_facts <on\|off\|N>` | Tune how many facts get inlined at session start |
+| `/personality [text]` | View/set user-defined behaviour rules ("always address me as ‘sir’", etc.) |
+| `/show_tools <on\|off>` | Toggle tool-call messages in chat |
+| `/listskill` · `/skill <name>` | Browse skills |
+| `/skill_install <url>` · `/skill_update` · `/skill_remove` · `/skill_verify` | Skill lifecycle |
+
+## Comparison
+
+|  | Opencode-Assistant | Claude Desktop / OpenClaw runtime | OpenCode TUI/CLI |
+|---|---|---|---|
+| Surface | Telegram (mobile-first) | Native desktop / web | Local terminal |
+| AI engine | OpenCode + free `big-pickle` | Claude API or Claw runtime | OpenCode |
+| Memory | SQLite + MCP, vectors optional | Built-in long-term in some clients | Per-session only |
+| Skills | OpenClaw `SKILL.md`, sha256-verified | OpenClaw `SKILL.md` | Custom commands |
+| Scheduled tasks | Three types (task/reminder/backup) | None native | None native |
+| Voice | Whisper STT + multi-provider TTS | Some clients only | None |
+| Cost | $0 (free model + free TTS/STT tiers) | Subscription | Whatever model you wire |
+| Setup | `./setup.sh` then `docker compose up -d` | App install | `npm install -g opencode-ai` |
+
+## Documentation
+
+- [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — first 5 minutes after install
+- [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — how memory tools wire into OpenCode
+- [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md) — full vector memory guide
+- [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — symptom → fix
+- [`docs/RELEASE_CHECKLIST.md`](./docs/RELEASE_CHECKLIST.md) — maintainer release flow
+- [`PRODUCT.md`](./PRODUCT.md) and [`CONCEPT.md`](./CONCEPT.md) — vision and boundaries
+
+## Acknowledgments
+
+Built on top of the open-source ecosystem:
+
+- **[OpenCode](https://opencode.ai)** by [SST](https://github.com/sst/opencode) — the AI coding agent under the hood.
+- **[OpenClaw skills ecosystem](https://github.com/topics/openclaw-skills)** — the `SKILL.md` standard and community skills.
+- **[Ollama](https://ollama.com)** — local embedding inference.
+- **[Speechify](https://api.speechify.ai)** — free TTS API.
+- **[Groq](https://console.groq.com)** — free Whisper STT API.
+- **[grammY](https://grammy.dev)** — Telegram bot framework.
+- **[better-sqlite3](https://github.com/WiseLibs/better-sqlite3)** — synchronous SQLite for Node.
+
+## License
+
+[MIT](LICENSE) — your data, your setup, your rules.
+
 ---
 
-## Development
+# 🇪🇸 Español
+
+## Qué es
+
+`Opencode-Assistant` es un bot de Telegram que convierte a [**OpenCode**](https://opencode.ai) en un asistente personal de IA mobile-first. Te da:
+
+- 🧠 **Memoria persistente** — datos, preferencias, contexto de proyectos, resúmenes de sesión, todo en SQLite y consultable en vivo vía herramientas MCP
+- 🔍 **Búsqueda semántica opcional** — embebe tus datos con [Ollama](https://ollama.com) (local, gratis) u OpenAI/Groq/Together (cloud), así el asistente encuentra *"prefiero el celeste"* cuando preguntas *"qué color me gusta?"*
+- 🪄 **Compatibilidad con SKILL.md de OpenClaw** — pega cualquier `SKILL.md` del ecosistema [openclaw-skills](https://github.com/topics/openclaw-skills) y funciona
+- ⏰ **Tareas programadas** — tres tipos (correr una sesión OpenCode, mandar un recordatorio, hacer backup de memoria)
+- 🎙️ **Voz** — STT con Whisper + TTS con Speechify/OpenAI/Edge, enviado como nota de voz de Telegram
+- 🔒 **Single-user, auto-alojado** — whitelist estricta; tus datos, tu VPS
+- 🌍 **Localizado en 6 idiomas** — en / es / de / fr / ru / zh
+
+## Por qué usarlo
+
+Si ya usas OpenCode en tu laptop, este es el mismo agente desde el celular, con memoria entre sesiones y skills. Si has usado Claude Desktop / OpenClaw runtime, esta es la versión auto-alojada, gratis, mobile-friendly, con el mismo formato de skill.
+
+## Requisitos
+
+### Mínimos (sin memoria vectorial)
+- 1 GB RAM, 5 GB de disco
+- Docker 20.10+ con Compose v2
+- Una cuenta de Telegram
+- Un token de bot de [@BotFather](https://t.me/BotFather)
+- Tu user ID numérico de [@userinfobot](https://t.me/userinfobot)
+
+### Recomendados (con memoria vectorial Ollama)
+- 2 GB RAM, 7 GB de disco
+- Mismos requisitos de Docker
+- [Ollama](https://ollama.com) instalado en el host (Linux: paquete nativo; macOS/Windows: Ollama Desktop)
+- ~270 MB extra para el modelo `nomic-embed-text`
+- Sin GPU — los embeddings son rápidos en CPU
+
+## Instalación rápida — Linux (Ubuntu/Debian/Fedora/Arch)
+
+```bash
+# 1. Clonar
+git clone https://github.com/JohanYP/Opencode-Assistant.git
+cd Opencode-Assistant
+
+# 2. Instalar Docker si no lo tienes
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER && newgrp docker
+
+# 3. Correr el wizard interactivo
+./setup.sh
+```
+
+El wizard pregunta:
+1. Idioma del bot (en/es/de/fr/ru/zh)
+2. Token del bot de Telegram (de [@BotFather](https://t.me/BotFather))
+3. Tu user ID de Telegram (de [@userinfobot](https://t.me/userinfobot))
+4. Modelo de IA (`big-pickle` por default — Claude Sonnet, gratis)
+5. Proveedor TTS (Speechify recomendado — 50K caracteres/mes gratis)
+6. Proveedor STT (Groq Whisper recomendado — tier gratis generoso)
+7. Zona horaria (autodetectada)
+8. Personalidad del asistente (nombre, tono, instrucciones)
+9. Opciones de interfaz
+10. Skills opcionales de OpenClaw para instalar desde GitHub
+
+Al final genera `.env`, todos los archivos de memoria, y arranca Docker automáticamente. Abres Telegram, hablas con tu bot. Listo.
+
+### Instalación manual (sin wizard)
 
 ```bash
 git clone https://github.com/JohanYP/Opencode-Assistant.git
 cd Opencode-Assistant
-npm install
 cp .env.example .env
-# Edit .env with your settings
-npm run dev
+# Editar .env: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USER_ID
+docker compose up -d
+docker compose logs -f bot
 ```
 
-Available scripts:
+## Instalación rápida — Windows (Git Bash)
 
-| Script | Description |
+> Todos los comandos van en Git Bash (no CMD ni PowerShell). Si no lo tienes: https://git-scm.com/download/win.
+
+```bash
+# 1. Instalar Docker Desktop para Windows
+# Descarga: https://docs.docker.com/desktop/install/windows-install/
+# Asegúrate de que el backend WSL 2 esté activo (default desde 2022).
+
+# 2. En Git Bash:
+git clone https://github.com/JohanYP/Opencode-Assistant.git
+cd Opencode-Assistant
+./setup.sh
+
+# 3. Si setup.sh falla en Windows (algunas features de bash difieren),
+#    usa el flujo manual:
+cp .env.example .env
+# Edita .env en cualquier editor (Notepad, VS Code, ...)
+docker compose up -d
+docker compose logs -f bot
+```
+
+> Nota Windows: `host.docker.internal` ya funciona nativamente con Docker Desktop, así que el setup opcional de Ollama de abajo funciona sin configuración extra.
+
+## Opcional: memoria vectorial con Ollama (recomendado)
+
+La memoria vectorial hace que `fact_search` sea semántica en vez de búsqueda por substring — *"qué color me gusta?"* encuentra *"prefiero el celeste"*. El install por default usa búsqueda LIKE; activa los vectores con tres pasos.
+
+### Linux
+
+```bash
+# 1. Instalar Ollama en el host (no dentro del contenedor del bot)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# 2. Hacer que Ollama escuche en todas las interfaces para que Docker pueda alcanzarlo
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+echo '[Service]'                              | sudo tee /etc/systemd/system/ollama.service.d/override.conf
+echo 'Environment="OLLAMA_HOST=0.0.0.0:11434"' | sudo tee -a /etc/systemd/system/ollama.service.d/override.conf
+sudo systemctl daemon-reload && sudo systemctl restart ollama
+
+# 3. Bloquear 11434 desde internet (seguridad)
+sudo ufw deny 11434/tcp 2>/dev/null || true
+
+# 4. Bajar el modelo de embeddings (~270 MB)
+ollama pull nomic-embed-text
+
+# 5. Decirle al bot dónde está (.env)
+cat >> .env <<'EOF'
+EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1
+EMBEDDING_MODEL=nomic-embed-text
+EMBEDDING_API_KEY=
+EOF
+
+# 6. Reiniciar y backfill de los facts existentes
+docker compose restart bot
+# En Telegram: /memory_reembed
+```
+
+### Windows (Ollama Desktop)
+
+```bash
+# 1. Descargar e instalar Ollama Desktop
+#    https://ollama.com/download/windows
+#    Corre como app de la bandeja del sistema.
+
+# 2. Abrir PowerShell como admin (una vez, para exponerlo a Docker)
+#    setx OLLAMA_HOST "0.0.0.0:11434"
+#    Después reinicia Ollama desde la bandeja.
+
+# 3. En Git Bash:
+ollama pull nomic-embed-text
+
+# 4. Editar .env:
+echo "EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1" >> .env
+echo "EMBEDDING_MODEL=nomic-embed-text" >> .env
+echo "EMBEDDING_API_KEY=" >> .env
+
+# 5. Reiniciar el bot, backfill en Telegram con /memory_reembed
+docker compose restart bot
+```
+
+### Alternativa cloud (OpenAI, Groq, ...)
+
+Si prefieres usar `text-embedding-3-small` de OpenAI (~$0.0001 por fact) o cualquier otra API compatible con `/v1/embeddings`:
+
+```env
+EMBEDDING_BASE_URL=https://api.openai.com/v1
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_API_KEY=sk-...
+```
+
+Guía completa y troubleshooting: [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md).
+
+## Actualizar
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Eso es todo. La memoria persiste en `./memory/` (volumen montado), las actualizaciones nunca pierden estado.
+
+## Comandos del bot
+
+### Núcleo
+| Comando | Descripción |
 |---|---|
-| `npm run dev` | Build and start |
-| `npm run build` | Compile TypeScript |
-| `npm start` | Run compiled code |
-| `npm run lint` | ESLint check |
-| `npm run format` | Format with Prettier |
-| `npm test` | Run tests (Vitest) |
+| `/status` | Estado del servidor, proyecto, sesión, modelo |
+| `/new` · `/abort` · `/sessions` | Gestión de sesiones |
+| `/projects` · `/worktree` · `/open` | Cambio de proyecto |
+| `/tts` · `/rename` · `/help` | Misceláneos |
+| `/task` · `/tasklist` | Tareas programadas |
+| `/commands` · `/mcps` | Comandos OpenCode y servidores MCP |
 
----
+### Memoria y skills
+| Comando | Descripción |
+|---|---|
+| `/memory <texto>` | Guardar un dato |
+| `/memory_search <consulta>` | Buscar (vectores si están activos, LIKE si no) |
+| `/memory_remove <id>` | Borrar un dato por id |
+| `/memory_export` | Volcar todo a archivos markdown |
+| `/memory_reembed` | Recalcular embeddings (después de activar vectores o cambiar modelo) |
+| `/inline_facts <on\|off\|N>` | Cuántos datos inyectar al iniciar sesión |
+| `/personality [texto]` | Reglas de comportamiento definidas por ti ("dime siempre señor", etc.) |
+| `/show_tools <on\|off>` | Mostrar/ocultar mensajes de herramientas en el chat |
+| `/listskill` · `/skill <nombre>` | Explorar skills |
+| `/skill_install <url>` · `/skill_update` · `/skill_remove` · `/skill_verify` | Gestión de skills |
 
-## Troubleshooting
+## Comparativa
 
-**Bot doesn't respond**
-- Check `TELEGRAM_ALLOWED_USER_ID` matches your actual ID ([@userinfobot](https://t.me/userinfobot))
-- Verify the bot token is correct
-
-**"OpenCode server is not available"**
-- Confirm both containers are up: `docker compose ps` should show `opencode` and `bot` running.
-- Check the OpenCode container logs: `docker compose logs opencode`.
-- Verify `OPENCODE_API_URL=http://opencode:4096` in `.env` (compose-network address).
-- Restart everything: `docker compose down && docker compose up -d`.
-
-**`setup.sh` failed to install Docker**
-- Inspect the install log: `cat /tmp/opencode-setup.log`.
-- Manual fallback for Docker: https://docs.docker.com/engine/install/.
-
-**Memory not injected**
-- Check `MEMORY_INJECT_ENABLED=true` in `.env`
-- Check the `memory/soul.md` file exists and is not empty
-
-**TTS not working**
-- Speechify: verify `SPEECHIFY_API_KEY` is set and valid
-- Check `TTS_PROVIDER` matches the credentials you configured
-
-**Skills not showing**
-- Place `.md` files in `memory/skills/`
-- Use `/listskill` to verify they are detected
-
----
-
-## Security
-
-- Strict user ID whitelist — only `TELEGRAM_ALLOWED_USER_ID` can interact with the bot
-- No open ports — bot communicates only with Telegram Bot API and your local OpenCode server
-- Memory files contain personal data — never commit them to version control (already in `.gitignore`)
-- Keep your `.env` file private
-
----
-
-## License
-
-[MIT](LICENSE)
-
----
-
-## How does it compare?
-
-|  | Opencode-Assistant | Claude Desktop / OpenClaw runtime | Plain OpenCode TUI/CLI |
+|  | Opencode-Assistant | Claude Desktop / OpenClaw runtime | OpenCode TUI/CLI |
 |---|---|---|---|
-| Surface | Telegram (mobile-friendly) | Native desktop app / web | Local terminal |
-| AI engine | OpenCode (local server) | Claude API or Claw runtime | OpenCode |
-| Memory | SQLite + MCP (live, queryable mid-session) | Conversation memory + long-term in some clients | Per-session, no cross-session memory |
-| Skills | Drop-in OpenClaw SKILL.md, sha256 verified, source-URL re-fetch | OpenClaw SKILL.md | Custom commands |
-| Default model | `big-pickle` (Claude Sonnet, free) | Subscription-based | Whatever you configure |
-| Multi-machine | One self-hosted instance per user; share via Telegram | Per device | Per machine |
-| Setup | `./setup.sh` + `docker compose up -d` | App install | `npm install -g opencode-ai` |
+| Superficie | Telegram (mobile-first) | App nativa / web | Terminal local |
+| Motor IA | OpenCode + `big-pickle` gratis | Claude API o Claw runtime | OpenCode |
+| Memoria | SQLite + MCP, vectores opcionales | Long-term en algunos clientes | Solo por sesión |
+| Skills | `SKILL.md` de OpenClaw, verificada con sha256 | `SKILL.md` de OpenClaw | Comandos custom |
+| Tareas programadas | Tres tipos (tarea/recordatorio/backup) | No nativo | No nativo |
+| Voz | STT Whisper + TTS multi-proveedor | Solo algunos clientes | Ninguno |
+| Costo | $0 (modelo gratis + TTS/STT con tier free) | Suscripción | Lo que cablees |
+| Setup | `./setup.sh` y `docker compose up -d` | Instalar app | `npm install -g opencode-ai` |
 
-The assistant is positioned as the **personal-use, mobile-first**
-counterpart to OpenCode's local-developer tooling, with the OpenClaw
-skill ecosystem as a shared standard between both worlds.
+## Documentación
+
+- [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — primeros 5 minutos
+- [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — cómo se conecta MCP a OpenCode
+- [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md) — guía completa de memoria vectorial
+- [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — síntoma → solución
+- [`docs/RELEASE_CHECKLIST.md`](./docs/RELEASE_CHECKLIST.md) — flujo de release del mantenedor
+- [`PRODUCT.md`](./PRODUCT.md) y [`CONCEPT.md`](./CONCEPT.md) — visión y límites
+
+## Agradecimientos
+
+Construido sobre el ecosistema open-source:
+
+- **[OpenCode](https://opencode.ai)** de [SST](https://github.com/sst/opencode) — el agente de IA bajo el capó.
+- **[Ecosistema OpenClaw skills](https://github.com/topics/openclaw-skills)** — el estándar `SKILL.md` y skills de la comunidad.
+- **[Ollama](https://ollama.com)** — inferencia local de embeddings.
+- **[Speechify](https://api.speechify.ai)** — API TTS gratis.
+- **[Groq](https://console.groq.com)** — API STT Whisper gratis.
+- **[grammY](https://grammy.dev)** — framework de bots de Telegram.
+- **[better-sqlite3](https://github.com/WiseLibs/better-sqlite3)** — SQLite síncrono para Node.
+
+## Licencia
+
+[MIT](LICENSE) — tus datos, tu setup, tus reglas.
 
 ---
 
-## Acknowledgments
-
-Opencode-Assistant is an independent personal-assistant project. Built on top of the open-source ecosystem:
-
-- **[OpenCode](https://opencode.ai)** by [SST](https://github.com/sst/opencode) — the AI coding agent that powers everything under the hood.
-- **[OpenClaw Skills ecosystem](https://github.com/topics/openclaw-skills)** — for the SKILL.md standard and the thousands of community skills compatible with it.
-- **[Speechify](https://api.speechify.ai)** — for the free TTS API.
-- **[Groq](https://console.groq.com)** — for the free Whisper STT API.
-
-Per the MIT license, prior copyright notices for the original code base are preserved in [`LICENSE`](./LICENSE).
+**Keywords:** OpenCode · OpenClaw · Claude Sonnet · MCP · Model Context Protocol · Ollama · vector memory · semantic search · embeddings · Telegram bot · AI assistant · self-hosted · personal AI · claude-skills · SKILL.md · big-pickle · cron jobs · Whisper STT · Speechify TTS · SQLite · openclaw-skills · sst/opencode
