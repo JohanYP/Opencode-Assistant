@@ -79,6 +79,12 @@ export interface AppConfig {
     backupEnabled: boolean;
     backupSchedule: string;
   };
+  embedding: {
+    baseUrl: string;
+    model: string;
+    apiKey: string;
+    enabled: boolean;
+  };
 }
 
 let cachedConfig: AppConfig | null = null;
@@ -283,6 +289,15 @@ export function loadConfig(): AppConfig {
       backupEnabled: getOptionalBooleanEnvVar("CRON_BACKUP_ENABLED", true),
       backupSchedule: getEnvVar("CRON_BACKUP_SCHEDULE", false) || "0 0 * * 0",
     },
+    embedding: (() => {
+      const baseUrl = (getEnvVar("EMBEDDING_BASE_URL", false) || "").trim();
+      return {
+        baseUrl,
+        model: getEnvVar("EMBEDDING_MODEL", false) || "text-embedding-3-small",
+        apiKey: getEnvVar("EMBEDDING_API_KEY", false),
+        enabled: baseUrl.length > 0,
+      };
+    })(),
   };
 
   return cachedConfig;
