@@ -57,8 +57,8 @@ describe("session/cache-manager", () => {
   let tempHome: string;
 
   beforeEach(async () => {
-    tempHome = await mkdtemp(path.join(os.tmpdir(), "opencode-telegram-cache-"));
-    process.env.OPENCODE_TELEGRAM_HOME = tempHome;
+    tempHome = await mkdtemp(path.join(os.tmpdir(), "opencode-assistant-cache-"));
+    process.env.OPENCODE_ASSISTANT_HOME = tempHome;
     setRuntimeMode("installed");
     await loadSettings();
     sessionListMock.mockReset();
@@ -67,7 +67,7 @@ describe("session/cache-manager", () => {
   });
 
   afterEach(async () => {
-    delete process.env.OPENCODE_TELEGRAM_HOME;
+    delete process.env.OPENCODE_ASSISTANT_HOME;
     await rm(tempHome, { recursive: true, force: true });
   });
 

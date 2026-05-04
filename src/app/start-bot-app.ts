@@ -15,7 +15,7 @@ import { migrateFromFiles, syncIdentityDocumentsFromFiles } from "../memory/migr
 import { closeDb } from "../memory/db.js";
 import { startMcpHttpServer, type McpHttpServerHandle } from "../mcp/http-server.js";
 import { getRuntimeMode } from "../runtime/mode.js";
-import { getRuntimePaths } from "../runtime/paths.js";
+import { getRuntimePaths, migrateLegacyAppHome } from "../runtime/paths.js";
 import { clearServiceStateFile } from "../service/manager.js";
 import { getServiceStateFilePathFromEnv, isServiceChildProcess } from "../service/runtime.js";
 import { getLogFilePath, initializeLogger, logger } from "../utils/logger.js";
@@ -36,7 +36,26 @@ async function getBotVersion(): Promise<string> {
 }
 
 export async function startBotApp(): Promise<void> {
+  // Move state from the previous "opencode-telegram-bot" config directory
+  // into "opencode-assistant" before anything else touches the filesystem.
+  // Idempotent: no-op once the new dir exists or no legacy dir is present.
+  let legacyMigrationNote: string | null = null;
+  try {
+    const legacy = migrateLegacyAppHome();
+    if (legacy.migrated) {
+      legacyMigrationNote = `Moved legacy config dir ${legacy.legacyPath} -> ${legacy.newPath}`;
+    }
+  } catch (error) {
+    legacyMigrationNote = `Legacy config-dir migration failed (continuing): ${
+      error instanceof Error ? error.message : String(error)
+    }`;
+  }
+
   await initializeLogger();
+
+  if (legacyMigrationNote) {
+    logger.info(`[App] ${legacyMigrationNote}`);
+  }
 
   const mode = getRuntimeMode();
   const runtimePaths = getRuntimePaths();

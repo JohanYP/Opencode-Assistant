@@ -42,15 +42,15 @@ describe("scheduled-task/store", () => {
   let tempHome: string;
 
   beforeEach(async () => {
-    tempHome = await mkdtemp(path.join(os.tmpdir(), "opencode-telegram-task-store-"));
-    process.env.OPENCODE_TELEGRAM_HOME = tempHome;
+    tempHome = await mkdtemp(path.join(os.tmpdir(), "opencode-assistant-task-store-"));
+    process.env.OPENCODE_ASSISTANT_HOME = tempHome;
     setRuntimeMode("installed");
     __resetSettingsForTests();
     await loadSettings();
   });
 
   afterEach(async () => {
-    delete process.env.OPENCODE_TELEGRAM_HOME;
+    delete process.env.OPENCODE_ASSISTANT_HOME;
     __resetSettingsForTests();
     await rm(tempHome, { recursive: true, force: true });
   });

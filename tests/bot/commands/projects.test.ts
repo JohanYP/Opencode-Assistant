@@ -9,8 +9,8 @@ import {
 describe("bot/commands/projects", () => {
   describe("getProjectFolderName", () => {
     it("extracts folder name from unix path", () => {
-      expect(getProjectFolderName("/Users/evan/work/opencode-telegram-bot")).toBe(
-        "opencode-telegram-bot",
+      expect(getProjectFolderName("/Users/evan/work/opencode-assistant")).toBe(
+        "opencode-assistant",
       );
     });
 
@@ -26,8 +26,8 @@ describe("bot/commands/projects", () => {
 
   describe("buildProjectButtonLabel", () => {
     it("formats label as index + folder + full path", () => {
-      expect(buildProjectButtonLabel(0, "/Users/evan/work/opencode-telegram-bot")).toBe(
-        "1. opencode-telegram-bot [/Users/evan/work/opencode-telegram-bot]",
+      expect(buildProjectButtonLabel(0, "/Users/evan/work/opencode-assistant")).toBe(
+        "1. opencode-assistant [/Users/evan/work/opencode-assistant]",
       );
     });
 

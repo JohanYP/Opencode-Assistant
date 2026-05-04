@@ -12,7 +12,7 @@ function getDefaultTestHome(): string {
   } catch {
     const fallbackPath = path.join(
       os.tmpdir(),
-      "opencode-telegram-bot",
+      "opencode-assistant",
       "test-home",
       `${process.pid}-${workerId}`,
     );
@@ -29,7 +29,7 @@ const TEST_ENV_DEFAULTS: Record<string, string> = {
   OPENCODE_MODEL_ID: "test-model",
   LOG_LEVEL: "error",
   LOG_RETENTION: "10",
-  OPENCODE_TELEGRAM_HOME: getDefaultTestHome(),
+  OPENCODE_ASSISTANT_HOME: getDefaultTestHome(),
 };
 
 export function ensureTestEnvironment(): void {
