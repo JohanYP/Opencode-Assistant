@@ -16,9 +16,9 @@
 [![Vector memory](https://img.shields.io/badge/Vector-Ollama%20%2F%20OpenAI-blue?style=flat-square)](docs/VECTOR_MEMORY.md)
 [![i18n](https://img.shields.io/badge/i18n-6%20languages-yellow?style=flat-square)](#)
 
-**Habla con un agente de IA real desde el celular. Memoria persistente, voz, skills compatibles con OpenClaw, todo corriendo en tu propia máquina. Cero suscripciones. Cero costos de API.**
+**Cero suscripciones. Cero API keys. Cero costos.** Un agente de IA real en Telegram, con memoria persistente, voz y compatibilidad nativa con el ecosistema de skills de [OpenClaw](https://github.com/topics/openclaw-skills) — todo corriendo en tu propia máquina con un `./setup.sh` de 10 minutos.
 
-**Talk to a real AI agent from your phone. Persistent memory, voice, OpenClaw-compatible skills — running on your own box. Zero subscriptions. Zero API costs.**
+**Zero subscriptions. Zero API keys. Zero cost.** A real AI agent on Telegram, with persistent memory, voice, and native compatibility with the [OpenClaw](https://github.com/topics/openclaw-skills) skills ecosystem — all running on your own box from a 10-minute `./setup.sh`.
 
 </div>
 
@@ -26,32 +26,39 @@
 
 ## 🎯 ¿Por qué existe? / Why does this exist?
 
-**ES:** Las herramientas de IA hoy te obligan a elegir: SaaS caro y bonito (Claude Desktop, ChatGPT Plus) o un CLI potente pero atado al desktop (OpenCode, Claude Code). Faltaba el **mobile-first, self-hosted, gratis y con memoria persistente real**. Eso es Opencode-Assistant.
+**ES:** Las herramientas de IA te obligan a elegir entre tres caminos: pagar suscripción (Claude Desktop, ChatGPT Plus), poner tu propia API key (CrewAI, AutoGen), o construir desde cero (LangGraph, OpenFang). Faltaba la cuarta opción: **cero costo, cero API keys, compatibilidad nativa con skills de OpenClaw, en tu celular**. Eso hace Opencode-Assistant.
 
-**EN:** Today's AI tools force a tradeoff: pretty but expensive SaaS (Claude Desktop, ChatGPT Plus) or powerful but desktop-bound CLI (OpenCode, Claude Code). What was missing: **mobile-first, self-hosted, free, with real persistent memory**. That's Opencode-Assistant.
+**EN:** AI tools today force a choice between three paths: pay subscriptions (Claude Desktop, ChatGPT Plus), bring your own API key (CrewAI, AutoGen), or build from scratch (LangGraph, OpenFang). What was missing: a fourth option — **zero cost, zero API keys, native OpenClaw skill compatibility, on your phone**. That's what Opencode-Assistant does.
 
 ---
 
 ## 📊 Cómo se compara / How it compares
 
+Comparativa honesta. Las casillas en negrita son donde **realmente** ganamos; el resto es contexto. Los demás frameworks son excelentes, simplemente apuntan a otra cosa.
+
+Honest comparison. Bold cells are where we **actually** win; the rest is context. The other frameworks are excellent — they just aim at different problems.
+
 | Feature | **Opencode-Assistant** | OpenClaw runtime | [OpenFang](https://github.com/RightNow-AI/openfang) | CrewAI | AutoGen | LangGraph | Claude Desktop |
 |---|---|---|---|---|---|---|---|
-| **01 Primary surface** | 📱 **Telegram** (mobile-first) | 🖥 Desktop/Web | 🖥 Desktop/CLI | 🖥 CLI | 🖥 CLI | 🖥 CLI | 🖥 Desktop |
-| **02 Language** | TypeScript | TypeScript | Rust | Python | Python | Python | — (closed) |
-| **03 Cost out of the box** | 💰 **$0** (big-pickle) | API or subscription | BYO model | BYO model | BYO model | BYO model | Subscription |
-| **04 Persistent memory** | ✅ SQLite + MCP + vectors | File-based | SQLite + FTS5 | 4-layer | External | Checkpoints | Native long-term |
-| **05 Vector / semantic search** | ✅ **Ollama or OpenAI** | ❌ | ✅ | ❌ | ❌ | ❌ | Some clients |
-| **06 OpenClaw `SKILL.md`** | ✅ **Drop-in compatible** | ✅ Native | ❌ | ❌ | ❌ | ❌ | ✅ Native |
-| **07 Cron jobs** | ✅ **3 types built-in** | ❌ | Scheduled tasks | ❌ | ❌ | ❌ | ❌ |
-| **08 Voice in / out** | ✅ Whisper + Speechify | ❌ | ❌ | ❌ | ❌ | ❌ | Some clients |
-| **09 Localization** | 🌍 **6 languages** | 🇬🇧 English | 🇬🇧 English | 🇬🇧 English | 🇬🇧 English | 🇬🇧 English | Multi |
-| **10 Setup time** | ⚡ **`./setup.sh` (≈10 min)** | App install | Build from source | `pip install` | `pip install` | `pip install` | App install |
-| **11 Self-hosted** | ✅ Docker, one command | ✅ | ✅ Docker | ✅ | ✅ | ✅ | ❌ Cloud |
-| **12 License** | MIT | MIT | MIT | MIT | Apache 2.0 | MIT | Closed |
+| **01 Cost out of the box** | 💰 **$0 — `big-pickle` included** | API key needed | BYO model | BYO model | BYO model | BYO model | Subscription |
+| **02 OpenClaw `SKILL.md`** | ✅ **Drop-in + auto-update from URL + sha256 verify** | ✅ Native | ❌ | ❌ | ❌ | ❌ | ✅ Native |
+| **03 Persistent memory** | SQLite + MCP + optional vectors | File-based | SQLite + FTS5 | 4-layer | External | Checkpoints | Native long-term |
+| **04 Vector / semantic search** | ✅ Ollama or OpenAI | ❌ | ✅ Built-in | ❌ | ❌ | ❌ | Some clients |
+| **05 Voice in / out** | ✅ Whisper + Speechify | ❌ | ❌ | ❌ | ❌ | ❌ | Some clients |
+| **06 Built-in cron / scheduling** | ✅ **3 types** (task / reminder / backup) | ❌ | Scheduled tasks | ❌ | ❌ | ❌ | ❌ |
+| **07 Localization (UI)** | 🌍 **6 languages** (en/es/de/fr/ru/zh) | 🇬🇧 English | 🇬🇧 English | 🇬🇧 English | 🇬🇧 English | 🇬🇧 English | Multi |
+| **08 Setup time** | ⚡ **`./setup.sh` (≈10 min)** | App install | Build from source | `pip install` | `pip install` | `pip install` | App install |
+| **09 Self-hosted** | ✅ Docker, one command | ✅ | ✅ Docker | ✅ | ✅ | ✅ | ❌ Cloud |
+| **10 Channel adapters** | 🟡 **Telegram only (mobile-focused)** | ~13 (Slack, Discord, etc.) | 40 (multi-channel framework) | Plugin-based | None native | None native | Native client |
+| **11 Production hardening** | Single-user whitelist | Basic | 16 security layers + WASM sandbox | Docker | AES enc. | Checkpoints | Cloud-managed |
+| **12 Language** | TypeScript | TypeScript | Rust | Python | Python | Python | — (closed) |
+| **13 License** | MIT | MIT | MIT | MIT | Apache 2.0 | MIT | Closed |
 
-> **Nota / Note:** OpenFang es un proyecto excelente y mucho más ambicioso a nivel "Agent OS" (sandbox WASM, 16 capas de seguridad, app Tauri). Si necesitas una infraestructura de agentes corporativa, mira a OpenFang. Si quieres **un asistente personal que funcione hoy en tu celular en 10 minutos sin pagar nada**, eso es lo que hace Opencode-Assistant.
->
-> OpenFang is an excellent and far more ambitious "Agent OS" project (WASM sandbox, 16 security layers, Tauri desktop app). If you need corporate-grade agent infrastructure, look at OpenFang. If you want **a personal assistant that runs on your phone today in 10 minutes without paying for anything**, that's what Opencode-Assistant does.
+### ⚠️ Tradeoffs honestos / Honest tradeoffs
+
+**ES:** Otros frameworks nos ganan en **multi-canal** (Slack/Discord/WhatsApp/web) y en **hardening empresarial** (las 16 capas de seguridad y el sandbox WASM de OpenFang son impresionantes). Este proyecto cambia esa amplitud por **costo cero, sin APIs, skills de OpenClaw nativas y setup en 10 minutos para un solo usuario en Telegram**. Si necesitas agentes multi-canal a escala, mira a OpenFang o construye con CrewAI/LangGraph. Si quieres un asistente personal en tu bolsillo, esto es para ti.
+
+**EN:** Other frameworks beat us on **multi-channel** (Slack/Discord/WhatsApp/web) and on **enterprise-grade hardening** (OpenFang's 16 security layers and WASM sandbox are genuinely impressive). This project trades that breadth for **zero cost, no APIs, native OpenClaw skills, and a 10-minute setup for a single user on Telegram**. If you need multi-channel agents at scale, look at OpenFang or build with CrewAI/LangGraph. If you want a personal assistant in your pocket, this is for you.
 
 ---
 
@@ -112,9 +119,10 @@ Un bot de Telegram que convierte a [**OpenCode**](https://opencode.ai) en un asi
 
 ## Por qué usarlo
 
-- Ya usas OpenCode en la laptop pero quieres mandarle prompts desde el bus → este es el mismo agente desde el celular
-- Has probado Claude Desktop / OpenClaw runtime y quieres lo mismo pero **gratis, en tu VPS, multi-idioma, con voz**
-- Te molesta que cada herramienta de IA tenga su propia memoria silo y nada cruce → MCP estándar + skill format estándar
+- **No quieres pagar nada.** El modelo `big-pickle` (Claude Sonnet) viene incluido sin API key. Speechify TTS y Groq Whisper STT tienen tier gratis suficiente para uso personal. Ollama para vectores corre en tu máquina, también gratis.
+- **Ya tienes skills de OpenClaw.** Pegas el `SKILL.md` en `memory/skills/` o lo instalas con `/skill_install <url>` desde GitHub — funciona igual que en Claude Desktop o el runtime de OpenClaw.
+- **Quieres tu memoria, no la de OpenAI.** SQLite local, MCP standard, exportable a markdown cuando quieras irte. Sin lock-in.
+- **Lo quieres en el celular.** Otros frameworks son CLI-only o desktop apps; este es Telegram desde el primer commit.
 
 ## Requisitos
 
@@ -313,9 +321,10 @@ A Telegram bot that turns [**OpenCode**](https://opencode.ai) into a mobile-firs
 
 ## Why use it
 
-- You already use OpenCode on your laptop and want to send it prompts from the bus → same agent, on your phone
-- You've tried Claude Desktop / OpenClaw runtime and want the same thing **free, on your VPS, multilingual, with voice**
-- You're tired of every AI tool having its own siloed memory → standard MCP + standard skill format
+- **You don't want to pay anything.** The `big-pickle` model (Claude Sonnet) is included with no API key. Speechify TTS and Groq Whisper STT both have free tiers that cover personal use. Ollama for vectors runs locally, also free.
+- **You already have OpenClaw skills.** Drop a `SKILL.md` into `memory/skills/` or install one with `/skill_install <url>` from GitHub — it works the same as in Claude Desktop or the OpenClaw runtime.
+- **You want your memory, not OpenAI's.** Local SQLite, MCP standard, exportable to markdown whenever you want to leave. No lock-in.
+- **You want it on your phone.** Other frameworks are CLI-only or desktop apps; this is Telegram from commit one.
 
 ## Requirements
 
