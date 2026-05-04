@@ -17,6 +17,12 @@ import {
   searchFacts,
 } from "../../memory/repositories/facts.js";
 import {
+  countFactsMissingEmbedding,
+  getFactsMissingEmbedding,
+  updateFactEmbedding,
+} from "../../memory/repositories/facts-vector.js";
+import { getEmbeddingDriver } from "../../memory/embedding-driver.js";
+import {
   getSkill,
   listSkills,
   verifySkillIntegrity,
@@ -186,6 +192,70 @@ export function registerMemoryCommands(bot: Bot<Context>): void {
     } catch (error) {
       logger.error("[MemoryCommands] /show_tools error:", error);
       await ctx.reply(t("show_tools.error"));
+    }
+  });
+
+  // /memory_reembed — backfill missing embeddings (and re-embed any vectors
+  // produced by a different model). No-op without an embedding driver.
+  bot.command("memory_reembed", async (ctx) => {
+    try {
+      const driver = getEmbeddingDriver();
+      if (!driver) {
+        await ctx.reply(t("memory.reembed.no_driver"));
+        return;
+      }
+
+      const total = countFactsMissingEmbedding(driver.model);
+      if (total === 0) {
+        await ctx.reply(
+          t("memory.reembed.complete", { processed: "0", failed: "0", model: driver.model }),
+        );
+        return;
+      }
+
+      await ctx.reply(t("memory.reembed.in_progress", { total: String(total) }));
+
+      let processed = 0;
+      let failed = 0;
+      const BATCH_SIZE = 32;
+      while (true) {
+        const pending = getFactsMissingEmbedding(driver.model, BATCH_SIZE);
+        if (pending.length === 0) break;
+
+        const vectors = await driver
+          .embedBatch(pending.map((f) => f.content))
+          .catch((err: unknown) => {
+            logger.warn("[MemoryCommands] /memory_reembed batch failed:", err);
+            return null;
+          });
+
+        if (!vectors || vectors.length !== pending.length) {
+          failed += pending.length;
+          break;
+        }
+
+        for (let i = 0; i < pending.length; i++) {
+          try {
+            updateFactEmbedding(pending[i].id, vectors[i], driver.model);
+            processed++;
+          } catch (err) {
+            logger.warn("[MemoryCommands] /memory_reembed update failed:", err);
+            failed++;
+          }
+        }
+      }
+
+      appendAudit("facts_reembedded", { model: driver.model, processed, failed });
+      await ctx.reply(
+        t("memory.reembed.complete", {
+          processed: String(processed),
+          failed: String(failed),
+          model: driver.model,
+        }),
+      );
+    } catch (error) {
+      logger.error("[MemoryCommands] /memory_reembed error:", error);
+      await ctx.reply(t("memory.reembed.failed"));
     }
   });
 

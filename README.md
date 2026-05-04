@@ -37,6 +37,7 @@ session — not just receive a snapshot at session start.
 **Quick links:**
 - [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — first 5 minutes after install
 - [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — how the memory tools wire into OpenCode
+- [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md) — optional semantic search over facts
 - [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — symptom-to-fix lookup
 - [`docs/RELEASE_CHECKLIST.md`](./docs/RELEASE_CHECKLIST.md) — maintainer release flow
 - [`PRODUCT.md`](./PRODUCT.md#roadmap) and [`CONCEPT.md`](./CONCEPT.md) — direction and boundaries
@@ -54,6 +55,24 @@ The assistant remembers who it is and what you've discussed across sessions. At 
 - **`memory/agents.md`** — agent selection instructions (read/write)
 - **`memory/session-summary.md`** — auto-updated summary of the last session (incremental, survives context overflow)
 - **`memory/skills/`** — one `.md` file per skill
+
+### Vector Memory (optional)
+For semantic search over your saved facts — so "what colour do I like?" finds "I prefer light blue" — set `EMBEDDING_BASE_URL` in `.env`. The bot embeds facts on write and ranks `fact_search` by cosine similarity. Default off; falls back to plain `LIKE` substring search.
+
+Two recommended setups:
+
+```env
+# Local, no API key, fully self-hosted (requires Ollama on host):
+EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1
+EMBEDDING_MODEL=nomic-embed-text
+
+# Cloud (OpenAI, Groq, Together, ... — any /v1/embeddings provider):
+EMBEDDING_BASE_URL=https://api.openai.com/v1
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_API_KEY=sk-...
+```
+
+After enabling, run `/memory_reembed` once to backfill embeddings for existing facts. Full guide: [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md).
 
 ### OpenClaw Skills Compatibility
 Drop any `SKILL.md` file from the [OpenClaw](https://github.com/topics/openclaw-skills) / [ClawHub](https://github.com/alirezarezvani/claude-skills) ecosystem into `memory/skills/` and the assistant can use it immediately. YAML frontmatter is parsed automatically to show skill names, descriptions, and categories.

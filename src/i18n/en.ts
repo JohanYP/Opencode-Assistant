@@ -26,6 +26,7 @@ export const en = {
   "cmd.description.memory_search": "Search saved facts",
   "cmd.description.memory_remove": "Delete a saved fact by id",
   "cmd.description.memory_export": "Export memory to markdown files",
+  "cmd.description.memory_reembed": "Recompute embeddings for vector memory",
   "cmd.description.help": "Help",
 
   "callback.unknown_command": "Unknown command",
@@ -144,6 +145,14 @@ export const en = {
   "show_tools.now_visible": "✅ Tool messages are now VISIBLE.",
   "show_tools.now_hidden": "✅ Tool messages are now HIDDEN. Only assistant responses will appear.",
   "show_tools.error": "Failed to update tool visibility setting.",
+
+  "memory.reembed.no_driver":
+    "No embedding driver configured. Set EMBEDDING_BASE_URL in .env to enable vector memory.",
+  "memory.reembed.in_progress":
+    "🔄 Re-embedding {total} fact(s)... This may take a moment.",
+  "memory.reembed.complete":
+    "✅ Re-embedding done. Processed: {processed}, failed: {failed}, model: {model}.",
+  "memory.reembed.failed": "Failed to re-embed memories. See logs for details.",
 
   "projects.empty":
     "📭 No projects found.\n\nOpen a directory in OpenCode and create at least one session, then it will appear here.",

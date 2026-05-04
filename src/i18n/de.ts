@@ -29,6 +29,7 @@ export const de: I18nDictionary = {
   "cmd.description.memory_search": "In gespeicherten Fakten suchen",
   "cmd.description.memory_remove": "Einen gespeicherten Fakt nach ID löschen",
   "cmd.description.memory_export": "Speicher in Markdown-Dateien exportieren",
+  "cmd.description.memory_reembed": "Embeddings für Vektor-Speicher neu berechnen",
   "cmd.description.help": "Hilfe",
 
   "callback.unknown_command": "Unbekannter Befehl",
@@ -152,6 +153,15 @@ export const de: I18nDictionary = {
   "show_tools.now_hidden":
     "✅ Tool-Nachrichten sind jetzt AUSGEBLENDET. Nur Assistenten-Antworten erscheinen.",
   "show_tools.error": "Tool-Sichtbarkeit konnte nicht aktualisiert werden.",
+
+  "memory.reembed.no_driver":
+    "Kein Embedding-Treiber konfiguriert. Setze EMBEDDING_BASE_URL in .env, um Vektor-Speicher zu aktivieren.",
+  "memory.reembed.in_progress":
+    "🔄 Re-Embedding für {total} Fakt(en) läuft... Das kann einen Moment dauern.",
+  "memory.reembed.complete":
+    "✅ Re-Embedding fertig. Verarbeitet: {processed}, fehlgeschlagen: {failed}, Modell: {model}.",
+  "memory.reembed.failed":
+    "Fehler beim Re-Embedding. Details siehe Logs.",
 
   "projects.empty":
     "📭 Keine Projekte gefunden.\n\nÖffne ein Verzeichnis in OpenCode und erstelle mindestens eine Sitzung, dann erscheint es hier.",

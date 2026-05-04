@@ -29,6 +29,7 @@ export const zh: I18nDictionary = {
   "cmd.description.memory_search": "搜索已保存的事实",
   "cmd.description.memory_remove": "按 id 删除已保存的事实",
   "cmd.description.memory_export": "将记忆导出为 markdown 文件",
+  "cmd.description.memory_reembed": "重新计算向量记忆的嵌入向量",
   "cmd.description.help": "帮助",
 
   "callback.unknown_command": "未知命令",
@@ -133,6 +134,13 @@ export const zh: I18nDictionary = {
   "show_tools.now_visible": "✅ 工具消息现在可见。",
   "show_tools.now_hidden": "✅ 工具消息现在已隐藏。仅显示助手的回复。",
   "show_tools.error": "无法更新工具可见性设置。",
+
+  "memory.reembed.no_driver":
+    "未配置嵌入驱动。在 .env 中设置 EMBEDDING_BASE_URL 即可启用向量记忆。",
+  "memory.reembed.in_progress": "🔄 正在为 {total} 条事实重新生成嵌入...请稍候。",
+  "memory.reembed.complete":
+    "✅ 重新嵌入完成。已处理：{processed}，失败：{failed}，模型：{model}。",
+  "memory.reembed.failed": "重新嵌入失败。详情请查看日志。",
 
   "projects.empty":
     "📭 未找到项目。\n\n在 OpenCode 中打开一个目录并至少创建一个会话，然后它会出现在这里。",

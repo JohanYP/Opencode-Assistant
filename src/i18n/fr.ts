@@ -29,6 +29,7 @@ export const fr: I18nDictionary = {
   "cmd.description.memory_search": "Rechercher dans les faits enregistrés",
   "cmd.description.memory_remove": "Supprimer un fait enregistré par id",
   "cmd.description.memory_export": "Exporter la mémoire en fichiers markdown",
+  "cmd.description.memory_reembed": "Recalculer les embeddings de la mémoire vectorielle",
   "cmd.description.help": "Aide",
 
   "callback.unknown_command": "Commande inconnue",
@@ -153,6 +154,14 @@ export const fr: I18nDictionary = {
   "show_tools.now_hidden":
     "✅ Les messages d'outils sont maintenant MASQUÉS. Seules les réponses de l'assistant apparaîtront.",
   "show_tools.error": "Impossible de mettre à jour la visibilité des outils.",
+
+  "memory.reembed.no_driver":
+    "Aucun pilote d'embeddings configuré. Définissez EMBEDDING_BASE_URL dans .env pour activer la mémoire vectorielle.",
+  "memory.reembed.in_progress":
+    "🔄 Recalcul des embeddings pour {total} fait(s)... Cela peut prendre un moment.",
+  "memory.reembed.complete":
+    "✅ Recalcul terminé. Traités : {processed}, échoués : {failed}, modèle : {model}.",
+  "memory.reembed.failed": "Échec du recalcul de la mémoire. Voir les logs pour plus de détails.",
 
   "projects.empty":
     "📭 Aucun projet trouvé.\n\nOuvrez un répertoire dans OpenCode et créez au moins une session, il apparaîtra ensuite ici.",

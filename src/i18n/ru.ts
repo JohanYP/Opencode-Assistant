@@ -29,6 +29,7 @@ export const ru: I18nDictionary = {
   "cmd.description.memory_search": "Поиск по сохранённым фактам",
   "cmd.description.memory_remove": "Удалить сохранённый факт по id",
   "cmd.description.memory_export": "Экспортировать память в markdown-файлы",
+  "cmd.description.memory_reembed": "Пересчитать эмбеддинги векторной памяти",
   "cmd.description.help": "Справка",
 
   "callback.unknown_command": "Неизвестная команда",
@@ -145,6 +146,15 @@ export const ru: I18nDictionary = {
   "show_tools.now_hidden":
     "✅ Сообщения инструментов теперь СКРЫТЫ. Будут видны только ответы ассистента.",
   "show_tools.error": "Не удалось обновить видимость инструментов.",
+
+  "memory.reembed.no_driver":
+    "Драйвер эмбеддингов не настроен. Установите EMBEDDING_BASE_URL в .env, чтобы включить векторную память.",
+  "memory.reembed.in_progress":
+    "🔄 Пересчёт эмбеддингов для {total} факт(ов)... Это может занять некоторое время.",
+  "memory.reembed.complete":
+    "✅ Пересчёт завершён. Обработано: {processed}, не удалось: {failed}, модель: {model}.",
+  "memory.reembed.failed":
+    "Не удалось пересчитать память. Подробности в логах.",
 
   "projects.empty":
     "📭 Проектов нет.\n\nОткройте директорию в OpenCode и создайте хотя бы одну сессию, после этого она появится здесь.",

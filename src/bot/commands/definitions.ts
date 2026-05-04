@@ -42,6 +42,7 @@ const COMMAND_DEFINITIONS: BotCommandI18nDefinition[] = [
   { command: "memory_search", descriptionKey: "cmd.description.memory_search" },
   { command: "memory_remove", descriptionKey: "cmd.description.memory_remove" },
   { command: "memory_export", descriptionKey: "cmd.description.memory_export" },
+  { command: "memory_reembed", descriptionKey: "cmd.description.memory_reembed" },
   { command: "context", descriptionKey: "cmd.description.context" },
   { command: "memfiles", descriptionKey: "cmd.description.memfiles" },
   { command: "show_tools", descriptionKey: "cmd.description.show_tools" },
