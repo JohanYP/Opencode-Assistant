@@ -28,8 +28,10 @@ exposed only on that network — it is NOT forwarded to the host.
 The bot runs the MCP server as an HTTP endpoint inside the bot
 process, sharing the same SQLite connection used by the bot commands.
 The opencode container's entrypoint script writes
-`~/.config/opencode/mcp.json` from the `ASSISTANT_MEMORY_MCP_URL`
-environment variable, so OpenCode discovers the server automatically.
+`~/.config/opencode/opencode.json` from the `ASSISTANT_MEMORY_MCP_URL`
+environment variable, so OpenCode discovers the server automatically
+through its native config format (top-level `mcp` key, entries with
+`type: "remote"` for HTTP transport).
 
 ## Protocol
 
@@ -63,10 +65,21 @@ In Docker compose (default):
   - `MCP_HTTP_HOST=0.0.0.0` (default `0.0.0.0`)
 - The opencode container receives `ASSISTANT_MEMORY_MCP_URL=http://bot:4097/mcp`
   via `docker-compose.yml`, and `docker/opencode-entrypoint.sh` writes the
-  matching `mcp.json` on container start.
+  matching `opencode.json` on container start. The format follows the
+  OpenCode v1.14+ schema:
+  ```json
+  {
+    "mcp": {
+      "opencode-assistant-memory": {
+        "type": "remote",
+        "url": "http://bot:4097/mcp"
+      }
+    }
+  }
+  ```
 
-If you provide your own `mcp.json` in the `opencode-config` volume, the
-entrypoint will leave it alone — your config wins.
+If you provide your own `opencode.json` in the `opencode-config` volume,
+the entrypoint will leave it alone — your config wins.
 
 ## Verifying the wiring
 
@@ -92,7 +105,7 @@ After `docker compose up -d --build`:
 
 3. Confirm OpenCode picked up the config:
    ```bash
-   docker compose exec opencode cat /root/.config/opencode/mcp.json
+   docker compose exec opencode cat /root/.config/opencode/opencode.json
    ```
 
 4. Open a Telegram session and ask the assistant something that
@@ -122,9 +135,14 @@ support spawn-based servers.
   - `docker compose logs bot | grep MCP/HTTP` — should show "listening on …".
     If missing, the bot did not start the server (check for `MCP_HTTP_ENABLED=false`
     in `.env`).
-  - `docker compose exec opencode cat /root/.config/opencode/mcp.json`
-    — should contain the `opencode-assistant-memory` entry. If missing,
-    re-check `ASSISTANT_MEMORY_MCP_URL` in `docker-compose.yml`.
+  - `docker compose exec opencode cat /root/.config/opencode/opencode.json`
+    — should contain a top-level `mcp.opencode-assistant-memory` entry
+    with `type: "remote"`. If missing, re-check `ASSISTANT_MEMORY_MCP_URL`
+    in `docker-compose.yml`.
+  - If you upgraded from an earlier version that wrote `mcp.json` instead
+    of `opencode.json`: the entrypoint cleans the legacy file up
+    automatically on next start. If for some reason it persists, delete
+    it manually: `docker compose exec opencode rm -f /root/.config/opencode/mcp.json`.
   - `docker compose exec opencode wget -qO- http://bot:4097/` —
     should print `{"ok":true}`. If it fails, the compose network is not
     routing as expected.
