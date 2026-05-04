@@ -1,21 +1,42 @@
 # MCP Memory Server — Integration Guide
 
-The bot ships a local **MCP server** (`opencode-assistant-memory-mcp`) that
-exposes the SQLite-backed memory to OpenCode as tools. With this in place,
-OpenCode can read and write memory **at any point during a session**,
-instead of receiving a one-shot snapshot at session start.
+The bot exposes a local **MCP server** that surfaces the SQLite-backed
+memory layer to OpenCode as tools. With this in place OpenCode reads
+and writes memory **at any point during a session**, instead of
+receiving a one-shot snapshot at session start.
 
-> **Status (as of writing):** the MCP server is fully implemented and tested.
-> Dockerized wiring between the OpenCode container and the bot's MCP server
-> is intentionally **NOT wired up yet** — that work is tracked as the next
-> step in the project roadmap. This guide documents both how to use the
-> server stand-alone today and how the Dockerized wiring will look.
+## Architecture
+
+```
+┌──────────────────────────┐         ┌────────────────────────────┐
+│   bot container          │         │   opencode container       │
+│                          │         │                            │
+│  Telegram <-> grammY     │         │   opencode serve           │
+│      │                   │         │      │                     │
+│      ▼                   │         │      ▼                     │
+│  SQLite (memory/data.db) │         │   reads ~/.config/opencode │
+│      ▲                   │         │     /mcp.json              │
+│      │                   │         │      │                     │
+│  MCP HTTP server :4097   │ <─────  │   POST  http://bot:4097/mcp│
+│  (handleRequest dispatch)│  HTTP   │   (JSON-RPC 2.0)           │
+└──────────────────────────┘         └────────────────────────────┘
+
+Both containers share the docker compose network. Port 4097 is
+exposed only on that network — it is NOT forwarded to the host.
+```
+
+The bot runs the MCP server as an HTTP endpoint inside the bot
+process, sharing the same SQLite connection used by the bot commands.
+The opencode container's entrypoint script writes
+`~/.config/opencode/mcp.json` from the `ASSISTANT_MEMORY_MCP_URL`
+environment variable, so OpenCode discovers the server automatically.
 
 ## Protocol
 
 - Spec: <https://spec.modelcontextprotocol.io>
-- Transport: stdio (newline-delimited JSON-RPC 2.0)
-- Protocol version: `2024-11-05`
+- Transport: plain HTTP POST + JSON-RPC 2.0 (path: `/mcp`)
+- Health probe: `GET /` returns `{"ok":true}`
+- Protocol version reported in `initialize`: `2024-11-05`
 
 ## Tools exposed
 
@@ -31,74 +52,82 @@ instead of receiving a one-shot snapshot at session start.
 | `skill_read(name)` | Full SKILL.md content for an installed skill. |
 | `audit_recent(event?, limit?)` | Recent memory audit log entries. |
 
-## Stand-alone usage
+## Configuration
 
-After `npm run build`, the server is available as a binary:
+In Docker compose (default):
+
+- The bot listens on `0.0.0.0:4097/mcp` inside its container.
+  Customizable via env vars on the bot:
+  - `MCP_HTTP_ENABLED=true` (default `true`)
+  - `MCP_HTTP_PORT=4097` (default `4097`)
+  - `MCP_HTTP_HOST=0.0.0.0` (default `0.0.0.0`)
+- The opencode container receives `ASSISTANT_MEMORY_MCP_URL=http://bot:4097/mcp`
+  via `docker-compose.yml`, and `docker/opencode-entrypoint.sh` writes the
+  matching `mcp.json` on container start.
+
+If you provide your own `mcp.json` in the `opencode-config` volume, the
+entrypoint will leave it alone — your config wins.
+
+## Verifying the wiring
+
+After `docker compose up -d --build`:
+
+1. Confirm both containers are healthy:
+   ```bash
+   docker compose ps
+   docker compose logs --tail 20 bot | grep "MCP/HTTP"
+   ```
+   The bot log should contain
+   `[MCP/HTTP] Memory MCP server listening on http://0.0.0.0:4097/mcp`.
+
+2. From the host, prove the MCP endpoint is reachable from inside the
+   compose network:
+   ```bash
+   docker compose exec opencode \
+     curl -s -X POST http://bot:4097/mcp \
+       -H 'Content-Type: application/json' \
+       -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+   ```
+   Expect a JSON-RPC response listing the nine tools above.
+
+3. Confirm OpenCode picked up the config:
+   ```bash
+   docker compose exec opencode cat /root/.config/opencode/mcp.json
+   ```
+
+4. Open a Telegram session and ask the assistant something that
+   needs persistent memory ("¿qué sabes de mí?", "lista mis skills
+   instaladas"). It should call `fact_recent` or `skill_list` instead of
+   replying that it has no memory.
+
+## Stand-alone (legacy stdio) usage
+
+Independent of the HTTP server, the bot still ships a stdio MCP server
+binary (`opencode-assistant-memory-mcp` → `dist/mcp/main.js`) for tools
+that can spawn an MCP server as a child process. After `npm run build`:
 
 ```bash
-# Start the server bound to stdio (it reads requests on stdin, writes on stdout):
-MEMORY_DIR=./memory node dist/mcp/main.js
-```
-
-A first-run on an existing markdown-based memory directory automatically
-imports `soul.md` / `agents.md` / `context.md` / `session-summary.md` /
-`memory.md` (split into facts) / `skills/*.md` / `cron.yml` into
-`memory/data.db`. A backup of the source files is created at
-`memory/.pre-sqlite-backup/`.
-
-## OpenCode configuration (planned)
-
-OpenCode discovers MCP servers through `~/.config/opencode/mcp.json`. The
-intended configuration once the Dockerized wiring is finalized:
-
-```json
-{
-  "mcpServers": {
-    "opencode-assistant-memory": {
-      "command": "node",
-      "args": ["/app/dist/mcp/main.js"],
-      "env": {
-        "MEMORY_DIR": "/workspace/memory"
-      }
-    }
-  }
-}
-```
-
-The bot's `setup.sh` will populate this file automatically as part of the
-guided install (Phase 3 of the roadmap).
-
-## Docker wiring (TODO)
-
-The OpenCode container needs access to:
-
-1. **Node + the MCP server binary**. Options under consideration:
-   - Bind-mount the bot's `dist/mcp/` into the OpenCode container.
-   - Or build a custom `opencode` image that includes Node + the binary.
-2. **Shared `MEMORY_DIR`** between the bot, the MCP server, and the
-   OpenCode container so SQLite is the single source of truth.
-
-When this wiring is in place, the migration to SQLite-backed memory
-becomes seamless for adopters.
-
-## Manual smoke test
-
-The server can be smoke-tested manually with a JSON-RPC roundtrip on the
-command line:
-
-```bash
+# Smoke test:
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | \
-  MEMORY_DIR=/tmp/test-memory node dist/mcp/main.js
+  MEMORY_DIR=./memory node dist/mcp/main.js
 ```
 
-The output is a single JSON-RPC response listing the 9 tools above.
+The HTTP path is preferred for the in-Docker integration; the stdio
+binary is mostly there for compatibility with MCP clients that only
+support spawn-based servers.
 
 ## Troubleshooting
 
-- **OpenCode does not see the memory tools**: verify that the server
-  process actually started by checking the OpenCode log for
-  `[MCP/Memory] Server ready`. If the log does not appear, OpenCode is
-  probably not invoking the server at all — review `mcp.json`.
+- **OpenCode does not see the memory tools**:
+  - `docker compose logs bot | grep MCP/HTTP` — should show "listening on …".
+    If missing, the bot did not start the server (check for `MCP_HTTP_ENABLED=false`
+    in `.env`).
+  - `docker compose exec opencode cat /root/.config/opencode/mcp.json`
+    — should contain the `opencode-assistant-memory` entry. If missing,
+    re-check `ASSISTANT_MEMORY_MCP_URL` in `docker-compose.yml`.
+  - `docker compose exec opencode wget -qO- http://bot:4097/` —
+    should print `{"ok":true}`. If it fails, the compose network is not
+    routing as expected.
 - **Schema errors after upgrading the bot**: `data.db` may have been
   written with an older schema. Move it aside and let the migration
   re-import from the markdown sources:
@@ -108,5 +137,8 @@ The output is a single JSON-RPC response listing the 9 tools above.
   ```
 - **`memory.md` edits not picked up after migration**: by design,
   re-running the migration on a populated DB is a no-op. Use
-  `/memory_export` and `/memory_import` (Phase 1.7) to round-trip
-  through markdown when needed.
+  `/memory_export` and `/memory_import` to round-trip through markdown
+  when needed.
+- **Health probe returns 200 but tool calls return 404**: you are
+  hitting a different path. The handler is mounted at `/mcp`. Adjust
+  `ASSISTANT_MEMORY_MCP_URL` to include the path.

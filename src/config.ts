@@ -69,6 +69,11 @@ export interface AppConfig {
     dir: string;
     injectEnabled: boolean;
   };
+  mcp: {
+    httpEnabled: boolean;
+    httpPort: number;
+    httpHost: string;
+  };
   cron: {
     ymlSync: boolean;
     backupEnabled: boolean;
@@ -262,6 +267,16 @@ export function loadConfig(): AppConfig {
     memory: {
       dir: getEnvVar("MEMORY_DIR", false) || "./memory",
       injectEnabled: getOptionalBooleanEnvVar("MEMORY_INJECT_ENABLED", true),
+    },
+    mcp: {
+      // The bot exposes its memory MCP server over HTTP on this host:port so
+      // a separate OpenCode container can reach it as a remote MCP server.
+      httpEnabled: getOptionalBooleanEnvVar("MCP_HTTP_ENABLED", true),
+      httpPort: getOptionalPositiveIntEnvVar("MCP_HTTP_PORT", 4097),
+      // Bind on 0.0.0.0 inside the container so the OpenCode container
+      // (in the same compose network) can reach it. The port is not
+      // forwarded to the host by default — only the docker network sees it.
+      httpHost: getEnvVar("MCP_HTTP_HOST", false) || "0.0.0.0",
     },
     cron: {
       ymlSync: getOptionalBooleanEnvVar("CRON_YML_SYNC", true),

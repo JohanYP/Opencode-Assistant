@@ -13,6 +13,7 @@ import { reconcileStoredModelSelection } from "../model/manager.js";
 import { startMemorySummaryWatcher, stopMemorySummaryWatcher } from "../memory/watcher.js";
 import { migrateFromFiles } from "../memory/migrate-from-files.js";
 import { closeDb } from "../memory/db.js";
+import { startMcpHttpServer, type McpHttpServerHandle } from "../mcp/http-server.js";
 import { getRuntimeMode } from "../runtime/mode.js";
 import { getRuntimePaths } from "../runtime/paths.js";
 import { clearServiceStateFile } from "../service/manager.js";
@@ -71,6 +72,24 @@ export async function startBotApp(): Promise<void> {
     logger.error("[App] Memory migration failed; continuing with markdown sources:", error);
   }
 
+  // Start the MCP HTTP server so OpenCode (in its own container on the
+  // same compose network) can call our memory tools as a remote MCP server.
+  let mcpHttpHandle: McpHttpServerHandle | null = null;
+  if (config.mcp.httpEnabled) {
+    try {
+      mcpHttpHandle = await startMcpHttpServer({
+        port: config.mcp.httpPort,
+        host: config.mcp.httpHost,
+      });
+    } catch (error) {
+      logger.error(
+        `[App] Failed to start MCP HTTP server on ${config.mcp.httpHost}:${config.mcp.httpPort}; ` +
+          `OpenCode will not see memory tools until this is resolved.`,
+        error,
+      );
+    }
+  }
+
   // Start watching session-summary.md so that when the LLM updates it
   // mid-session the next new session will receive the updated summary.
   startMemorySummaryWatcher();
@@ -121,6 +140,11 @@ export async function startBotApp(): Promise<void> {
     scheduledTaskRuntime.shutdown();
     stopCronYmlSync();
     stopMemorySummaryWatcher();
+    if (mcpHttpHandle) {
+      void mcpHttpHandle.close().catch((err) => {
+        logger.warn("[App] Failed to stop MCP HTTP server cleanly", err);
+      });
+    }
     closeDb();
 
     shutdownTimeout = setTimeout(() => {

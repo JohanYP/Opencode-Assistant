@@ -6,19 +6,27 @@ services:
     volumes:
       - ./memory:/workspace/memory
       - opencode-config:/root/.config/opencode
+    environment:
+      # The opencode-entrypoint.sh writes mcp.json based on this URL so
+      # OpenCode automatically discovers the bot's memory MCP server.
+      - ASSISTANT_MEMORY_MCP_URL=http://bot:4097/mcp
+    depends_on:
+      bot:
+        condition: service_started
     restart: unless-stopped
 
   bot:
     build:
       context: .
       dockerfile: Dockerfile
-    depends_on:
-      opencode:
-        condition: service_started
     volumes:
       - ./memory:/app/memory
       - bot-data:/app/data
     env_file: .env
+    # MCP HTTP server is exposed only on the compose network (no host port
+    # mapping). OpenCode reaches it at http://bot:4097/mcp.
+    expose:
+      - "4097"
     restart: unless-stopped
 
 volumes:

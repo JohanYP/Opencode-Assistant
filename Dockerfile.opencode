@@ -27,9 +27,16 @@ RUN npm install -g opencode-ai@latest
 RUN mkdir -p /workspace /root/.config/opencode
 WORKDIR /workspace
 
+# Entrypoint generates ~/.config/opencode/mcp.json from env vars on
+# container start so OpenCode discovers the bot's memory MCP server
+# automatically.
+COPY docker/opencode-entrypoint.sh /usr/local/bin/opencode-entrypoint.sh
+RUN chmod +x /usr/local/bin/opencode-entrypoint.sh
+
 EXPOSE 4096
 
 # Bind to 0.0.0.0 so the bot container can reach the server through the
 # compose network. The bot reads OPENCODE_API_URL=http://opencode:4096
 # from .env and connects there.
+ENTRYPOINT ["/usr/local/bin/opencode-entrypoint.sh"]
 CMD ["opencode", "serve", "--hostname", "0.0.0.0", "--port", "4096"]
