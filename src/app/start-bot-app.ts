@@ -40,7 +40,7 @@ export async function startBotApp(): Promise<void> {
   const version = await getBotVersion();
   const logFilePath = getLogFilePath();
 
-  logger.info(`Starting OpenCode Telegram Bot v${version}...`);
+  logger.info(`Starting Opencode-Assistant v${version}...`);
   logger.info(`Config loaded from ${runtimePaths.envFilePath}`);
   if (logFilePath) {
     logger.info(`Logs are written to ${logFilePath}`);
