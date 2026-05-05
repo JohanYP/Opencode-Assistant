@@ -308,6 +308,47 @@ the supported customization path.
 
 ---
 
+## Tools or MCP servers I installed inside opencode disappeared
+
+`docker compose up -d --build opencode` reconstructs the image — anything
+you installed by shelling into the container goes back to whatever the
+Dockerfile produces. **What persists** vs **what doesn't**:
+
+| Where the install lands | Persists across `--build`? |
+|---|---|
+| `/root/.config/opencode/opencode.json` (e.g. MCP server entries via `jq`) | ✅ Yes — `opencode-config` volume |
+| `/root/.npm-global` (any `npm install -g <pkg>`) | ✅ Yes — `opencode-npm` volume |
+| `/root/.local` (any `pip install --user <pkg>`) | ✅ Yes — `opencode-pip` volume |
+| `/usr/local/bin/<binary>` (e.g. `apt-get install`, `pip install` system-wide, `curl ... -o /usr/local/bin/...`) | ❌ No — these are in image layers |
+| `/usr/local/lib/node_modules/opencode-ai` | ⚠️ Always replaced from the Dockerfile on `--build` |
+
+So as long as you stick to:
+
+```bash
+docker compose exec opencode npm install -g <pkg>
+docker compose exec opencode pip install --user <pkg>
+```
+
+your installs survive every rebuild. If you instead did `apt-get install`
+or a `pip install` without `--user`, that install will be gone after the
+next rebuild — you'll need to repeat it, or put it in `Dockerfile.opencode`
+permanently if it's something you want every user of this repo to have.
+
+To verify what's installed and where:
+
+```bash
+# npm globals (user-installed) — should be in volume
+docker compose exec opencode ls /root/.npm-global/bin
+
+# pip --user binaries — also in volume
+docker compose exec opencode ls /root/.local/bin
+
+# OpenCode itself — system path, replaced on rebuild
+docker compose exec opencode which opencode
+```
+
+---
+
 ## Where to look first when something is wrong
 
 | Where | Command |

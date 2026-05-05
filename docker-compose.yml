@@ -6,6 +6,14 @@ services:
     volumes:
       - ./memory:/workspace/memory
       - opencode-config:/root/.config/opencode
+      # Anything the user installs from inside the container with
+      # `npm install -g <pkg>` lands in /root/.npm-global (we configure
+      # npm's prefix to that path in Dockerfile.opencode). Mounted as a
+      # named volume so installs survive `docker compose up -d --build`.
+      - opencode-npm:/root/.npm-global
+      # Same idea for `pip install --user <pkg>`. /root/.local/bin is in
+      # PATH, so user-installed Python tools are immediately runnable.
+      - opencode-pip:/root/.local
     environment:
       # The opencode-entrypoint.sh writes mcp.json based on this URL so
       # OpenCode automatically discovers the bot's memory MCP server.
@@ -37,4 +45,6 @@ services:
 
 volumes:
   opencode-config:
+  opencode-npm:
+  opencode-pip:
   bot-data:

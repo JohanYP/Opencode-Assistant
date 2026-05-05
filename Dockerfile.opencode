@@ -20,13 +20,21 @@ RUN apt-get update \
        git openssh-client bash curl ca-certificates jq \
   && rm -rf /var/lib/apt/lists/*
 
-# Install the OpenCode CLI globally. The platform-specific binary is
-# pulled in by npm through optionalDependencies on glibc Linux.
+# Install the OpenCode CLI globally into the system prefix (/usr/local).
+# This intentionally happens BEFORE we change npm's prefix so opencode-ai
+# stays in the image layer and gets refreshed on each `--build`. The
+# user-installed packages further down go to a separate prefix backed
+# by a volume.
 RUN npm install -g opencode-ai@latest
 
-# Default workspace + persistent config locations. Both are mounted as
-# volumes from docker-compose.yml so they survive container restarts.
-RUN mkdir -p /workspace /root/.config/opencode
+# Switch npm's global prefix to a path that is mounted as a volume in
+# docker-compose.yml (opencode-npm). Anything the user installs via
+# `npm install -g <pkg>` from now on lands in /root/.npm-global and
+# survives image rebuilds. /root/.local covers `pip install --user`.
+# Both directories are added to PATH so installed binaries Just Work.
+RUN mkdir -p /workspace /root/.config/opencode /root/.npm-global /root/.local/bin \
+  && npm config set prefix /root/.npm-global
+ENV PATH="/root/.npm-global/bin:/root/.local/bin:${PATH}"
 WORKDIR /workspace
 
 # Entrypoint generates ~/.config/opencode/mcp.json from env vars on
