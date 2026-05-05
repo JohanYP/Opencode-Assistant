@@ -95,4 +95,17 @@ describe("memory/injector inlineRecentFacts", () => {
     ctx = await buildMemoryContext();
     expect(ctx).toContain("I prefer light blue");
   });
+
+  it("ignoreInlineFactsOverride=true bypasses the user override (used by scheduled tasks)", async () => {
+    addFact({ content: "alpha" });
+    // User has explicitly disabled inlining for the interactive chat...
+    await setUiPreferences({ inlineRecentFacts: 0 });
+
+    // ...but scheduled tasks still get the env default.
+    const ctxRespecting = await buildMemoryContext();
+    expect(ctxRespecting).not.toContain("alpha");
+
+    const ctxIgnoring = await buildMemoryContext({ ignoreInlineFactsOverride: true });
+    expect(ctxIgnoring).toContain("alpha");
+  });
 });

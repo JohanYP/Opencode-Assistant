@@ -247,7 +247,19 @@ export async function executeScheduledTask(
     } = {
       sessionID: session.id,
       directory: session.directory,
-      parts: [{ type: "text", text: await injectMemoryIntoPrompt(task.prompt, session.id) }],
+      parts: [
+        {
+          type: "text",
+          // ignoreInlineFactsOverride: scheduled tasks run unattended,
+          // so we always want the env-default amount of inlined facts
+          // even when the user has /inline_facts off (set during
+          // interactive vector-recall testing). Without this flag, an
+          // off override would leave the task with zero memory context.
+          text: await injectMemoryIntoPrompt(task.prompt, session.id, {
+            ignoreInlineFactsOverride: true,
+          }),
+        },
+      ],
       agent: SCHEDULED_TASK_AGENT,
     };
 

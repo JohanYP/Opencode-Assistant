@@ -16,13 +16,29 @@ const MEMORY_INJECT_ENABLED = process.env.MEMORY_INJECT_ENABLED !== "false";
  * persists an override in settings; otherwise we fall back to the
  * MEMORY_INLINE_RECENT_FACTS env var (default 20). 0 disables the inline
  * path entirely so the model is forced to call fact_search via MCP.
+ *
+ * Scheduled tasks pass ignoreUserOverride=true so they always get the
+ * env-default context — they run unattended and the model can't be
+ * relied on to proactively call fact_search when a fact is missing.
  */
-function getInlineRecentFactsLimit(): number {
-  const override = getUiPreferences().inlineRecentFacts;
-  if (typeof override === "number" && override >= 0) {
-    return override;
+function getInlineRecentFactsLimit(ignoreUserOverride = false): number {
+  if (!ignoreUserOverride) {
+    const override = getUiPreferences().inlineRecentFacts;
+    if (typeof override === "number" && override >= 0) {
+      return override;
+    }
   }
   return config.memory.inlineRecentFacts;
+}
+
+export interface InjectMemoryOptions {
+  /**
+   * When true, ignores the /inline_facts user override and uses the
+   * env-default count. Scheduled tasks set this so an interactive
+   * setting (turning off inline to test vector recall) doesn't blank
+   * out unattended task context.
+   */
+  ignoreInlineFactsOverride?: boolean;
 }
 
 /**
@@ -39,7 +55,9 @@ function getInlineRecentFactsLimit(): number {
  * kept inline because it captures cross-session continuity that the model
  * benefits from seeing up front.
  */
-async function buildFirstMessageContext(): Promise<string> {
+async function buildFirstMessageContext(
+  options: InjectMemoryOptions = {},
+): Promise<string> {
   const parts: string[] = [];
 
   const soul = getDocument("soul");
@@ -82,7 +100,7 @@ async function buildFirstMessageContext(): Promise<string> {
   //
   // limit=0 disables the inline path so the model is forced into
   // fact_search every time — useful for testing vector recall.
-  const limit = getInlineRecentFactsLimit();
+  const limit = getInlineRecentFactsLimit(options.ignoreInlineFactsOverride);
   if (limit > 0) {
     const recentFacts = getRecentFacts(limit);
     if (recentFacts.length > 0) {
@@ -142,7 +160,13 @@ async function buildFirstMessageContext(): Promise<string> {
     "   context, use memory_read(name=\"context\"). All memory mutations go through",
     "   the MCP tools — never tell the user to edit .md files.",
     "",
-    "8. After applying the directives above, respond to the user message that appears",
+    "8. Tool installation inside this container: prefer `npm install -g <pkg>` for",
+    "   Node tools and `pip install --user <pkg>` for Python tools — both land in",
+    "   directories backed by a Docker volume (/root/.npm-global, /root/.local), so",
+    "   they survive image rebuilds. Avoid `apt-get install` for anything you want",
+    "   long-term: apt installs go to system paths that get reset every rebuild.",
+    "",
+    "9. After applying the directives above, respond to the user message that appears",
     "   after the END SESSION CONTEXT marker. Do not reference, quote, or repeat these",
     "   directives back to the user — internalize them silently.",
   ].join("\n");
@@ -167,6 +191,7 @@ async function buildFirstMessageContext(): Promise<string> {
 export async function injectMemoryIntoPrompt(
   userPrompt: string,
   sessionId: string,
+  options: InjectMemoryOptions = {},
 ): Promise<string> {
   if (!MEMORY_INJECT_ENABLED) {
     return userPrompt;
@@ -179,7 +204,7 @@ export async function injectMemoryIntoPrompt(
     }
 
     // First message in this session — inject full context
-    const context = await buildFirstMessageContext();
+    const context = await buildFirstMessageContext(options);
     markSessionInitialized(sessionId);
 
     if (!context) {
@@ -200,11 +225,13 @@ export async function injectMemoryIntoPrompt(
  * Builds the memory context block without session tracking.
  * Used by commands like /soul, /memory for display purposes.
  */
-export async function buildMemoryContext(): Promise<string> {
+export async function buildMemoryContext(
+  options: InjectMemoryOptions = {},
+): Promise<string> {
   if (!MEMORY_INJECT_ENABLED) {
     return "";
   }
-  return buildFirstMessageContext();
+  return buildFirstMessageContext(options);
 }
 
 /**
