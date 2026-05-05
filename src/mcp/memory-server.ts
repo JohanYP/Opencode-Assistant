@@ -18,11 +18,21 @@ import {
 import { searchFactsByVector } from "../memory/repositories/facts-vector.js";
 import { getEmbeddingDriver } from "../memory/embedding-driver.js";
 import {
+  getSkill,
+  installSkill,
+  listSkills,
+  removeSkill,
+} from "../memory/repositories/skills.js";
+import {
+  assertValidSkillName,
+  writeSkillFile,
+  removeSkillFile,
+} from "../memory/skill-files.js";
+import {
   getDocument,
   setDocument,
   type DocumentName,
 } from "../memory/repositories/documents.js";
-import { getSkill, listSkills } from "../memory/repositories/skills.js";
 import { appendAudit, getAudit } from "../memory/repositories/audit.js";
 
 const MCP_PROTOCOL_VERSION = "2024-11-05";
@@ -146,6 +156,67 @@ export const MEMORY_TOOLS = [
   {
     name: "skill_read",
     description: "Read the full SKILL.md content of an installed skill by name.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Skill name (slug)" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "skill_create",
+    description:
+      "Create a new skill from markdown content. Writes both the SQLite row and memory/skills/<name>.md so it appears in /listskill, gets inlined in future sessions, and survives DB resets. " +
+      "Use this when the user asks you to create or learn a new skill. If the skill needs auxiliary files (e.g. a Python script), use Bash/Write tools to put them next to the .md at memory/skills/<name>/<file>. " +
+      "Returns 'already_exists' when the name is taken — call skill_update instead.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "Slug-style identifier (lowercase letters, digits, '-' or '_'). 1-64 chars.",
+        },
+        content: {
+          type: "string",
+          description:
+            "Full SKILL.md content including YAML frontmatter (name, description, optional category/version) and the instructions body.",
+        },
+        description: {
+          type: "string",
+          description: "Optional short description (mirrors the frontmatter).",
+        },
+        category: {
+          type: "string",
+          description: "Optional category (e.g. 'engineering', 'research').",
+        },
+      },
+      required: ["name", "content"],
+    },
+  },
+  {
+    name: "skill_update",
+    description:
+      "Replace the content of an existing skill. Updates both the SQLite row and memory/skills/<name>.md. Errors when the skill doesn't exist — call skill_create instead.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Skill name (slug)" },
+        content: { type: "string", description: "Replacement SKILL.md content." },
+        description: {
+          type: "string",
+          description: "Optional updated short description.",
+        },
+        category: { type: "string", description: "Optional updated category." },
+      },
+      required: ["name", "content"],
+    },
+  },
+  {
+    name: "skill_delete",
+    description:
+      "Remove a skill from the registry. Deletes the SQLite row and memory/skills/<name>.md. Auxiliary files in memory/skills/<name>/ are NOT touched — delete them manually if no longer needed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -332,6 +403,103 @@ async function executeToolCall(params: ToolCallParams | undefined): Promise<unkn
         throw new RpcError(ErrorCode.InvalidParams, `Skill not found: ${name}`);
       }
       return asJsonContent(skill);
+    }
+
+    case "skill_create": {
+      const name = requireString(args, "name");
+      const content = requireString(args, "content");
+      const description =
+        args && typeof args.description === "string" ? (args.description as string) : null;
+      const category =
+        args && typeof args.category === "string" ? (args.category as string) : null;
+
+      try {
+        assertValidSkillName(name);
+      } catch (err) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+
+      if (getSkill(name)) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          `Skill "${name}" already exists. Use skill_update to replace it.`,
+        );
+      }
+
+      const skill = installSkill({ name, content, description, category });
+      await writeSkillFile(name, content);
+      appendAudit("skill_installed", { name, source: "opencode_mcp", category });
+      return asJsonContent({
+        ok: true,
+        name: skill.name,
+        installedAt: skill.installedAt,
+        sha256: skill.sha256,
+      });
+    }
+
+    case "skill_update": {
+      const name = requireString(args, "name");
+      const content = requireString(args, "content");
+      const description =
+        args && typeof args.description === "string" ? (args.description as string) : null;
+      const category =
+        args && typeof args.category === "string" ? (args.category as string) : null;
+
+      try {
+        assertValidSkillName(name);
+      } catch (err) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+
+      const existing = getSkill(name);
+      if (!existing) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          `Skill "${name}" not found. Use skill_create to add it.`,
+        );
+      }
+
+      const skill = installSkill({
+        name,
+        content,
+        description: description ?? existing.description,
+        category: category ?? existing.category,
+      });
+      await writeSkillFile(name, content);
+      appendAudit("skill_updated", { name, source: "opencode_mcp" });
+      return asJsonContent({
+        ok: true,
+        name: skill.name,
+        updatedAt: skill.updatedAt,
+        sha256: skill.sha256,
+      });
+    }
+
+    case "skill_delete": {
+      const name = requireString(args, "name");
+
+      try {
+        assertValidSkillName(name);
+      } catch (err) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+
+      const removed = removeSkill(name);
+      if (!removed) {
+        throw new RpcError(ErrorCode.InvalidParams, `Skill "${name}" not found.`);
+      }
+      await removeSkillFile(name);
+      appendAudit("skill_removed", { name, source: "opencode_mcp" });
+      return asJsonContent({ ok: true, name });
     }
 
     case "audit_recent": {

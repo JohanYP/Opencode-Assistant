@@ -97,6 +97,9 @@ describe("mcp/memory-server", () => {
           "fact_delete",
           "skill_list",
           "skill_read",
+          "skill_create",
+          "skill_update",
+          "skill_delete",
           "audit_recent",
         ]),
       );
@@ -303,6 +306,101 @@ describe("mcp/memory-server", () => {
 
     it("throws InvalidParams for missing skill", async () => {
       await expect(callTool("skill_read", { name: "nope" })).rejects.toMatchObject({
+        code: ErrorCode.InvalidParams,
+      });
+    });
+
+    it("skill_create writes both SQLite and the .md file", async () => {
+      const out = decode(
+        await callTool("skill_create", {
+          name: "fresh-skill",
+          content: "# Fresh\n\nDoes a thing.",
+          description: "fresh demo",
+          category: "demo",
+        }),
+      ) as { ok: boolean; name: string };
+
+      expect(out.ok).toBe(true);
+      expect(out.name).toBe("fresh-skill");
+
+      // SQLite row
+      const list = decode(await callTool("skill_list", {})) as {
+        skills: Array<{ name: string; description: string | null }>;
+      };
+      expect(list.skills.find((s) => s.name === "fresh-skill")?.description).toBe("fresh demo");
+
+      // .md file on disk
+      const filePath = path.join(tempDir, "skills", "fresh-skill.md");
+      const content = await fs.promises.readFile(filePath, "utf-8");
+      expect(content).toBe("# Fresh\n\nDoes a thing.");
+    });
+
+    it("skill_create rejects when the name already exists", async () => {
+      installSkill({ name: "taken", content: "old" });
+      await expect(
+        callTool("skill_create", { name: "taken", content: "new" }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    });
+
+    it("skill_create rejects invalid names", async () => {
+      await expect(
+        callTool("skill_create", { name: "../escape", content: "x" }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+      await expect(
+        callTool("skill_create", { name: "Has Spaces", content: "x" }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    });
+
+    it("skill_update replaces content and rewrites the .md", async () => {
+      installSkill({ name: "evolving", content: "v1", description: "old desc" });
+
+      const out = decode(
+        await callTool("skill_update", {
+          name: "evolving",
+          content: "v2",
+        }),
+      ) as { ok: boolean };
+      expect(out.ok).toBe(true);
+
+      const read = decode(await callTool("skill_read", { name: "evolving" })) as {
+        content: string;
+        description: string | null;
+      };
+      expect(read.content).toBe("v2");
+      // description preserved when not provided
+      expect(read.description).toBe("old desc");
+
+      const filePath = path.join(tempDir, "skills", "evolving.md");
+      expect(await fs.promises.readFile(filePath, "utf-8")).toBe("v2");
+    });
+
+    it("skill_update errors when the skill doesn't exist", async () => {
+      await expect(
+        callTool("skill_update", { name: "ghost", content: "x" }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    });
+
+    it("skill_delete removes both row and file", async () => {
+      installSkill({ name: "doomed", content: "bye" });
+      // Pre-write the file the way skill_create would
+      const filePath = path.join(tempDir, "skills", "doomed.md");
+      await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.promises.writeFile(filePath, "bye", "utf-8");
+
+      const out = decode(await callTool("skill_delete", { name: "doomed" })) as {
+        ok: boolean;
+      };
+      expect(out.ok).toBe(true);
+
+      await expect(fs.promises.access(filePath)).rejects.toThrow();
+      const list = decode(await callTool("skill_list", {})) as {
+        skills: Array<{ name: string }>;
+      };
+      expect(list.skills.find((s) => s.name === "doomed")).toBeUndefined();
+    });
+
+    it("skill_delete errors when the skill doesn't exist", async () => {
+      await expect(callTool("skill_delete", { name: "ghost" })).rejects.toMatchObject({
         code: ErrorCode.InvalidParams,
       });
     });
