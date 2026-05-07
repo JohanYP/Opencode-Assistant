@@ -1022,6 +1022,33 @@ SUMMARY_EOF
   fi
 
   # ──────────────────────────────────────────────────────────
+  # CLI INSTALL — symlink so users can type `opencode-assistant --update`
+  # ──────────────────────────────────────────────────────────
+  install_cli_symlink() {
+    local cli_source="$SCRIPT_DIR/bin/opencode-assistant"
+    local cli_target="/usr/local/bin/opencode-assistant"
+
+    if [[ ! -f "$cli_source" ]]; then
+      return
+    fi
+
+    chmod +x "$cli_source" 2>/dev/null || true
+
+    if [[ -L "$cli_target" ]] && [[ "$(readlink -f "$cli_target" 2>/dev/null)" == "$(readlink -f "$cli_source" 2>/dev/null)" ]]; then
+      print_ok "CLI already linked at $cli_target"
+      return
+    fi
+
+    if has_sudo && sudo ln -sf "$cli_source" "$cli_target" 2>/dev/null; then
+      print_ok "CLI linked at $cli_target — run 'opencode-assistant --help'"
+      return
+    fi
+
+    print_warn "Could not symlink the CLI to $cli_target."
+    echo "      Run manually:  sudo ln -sf $cli_source $cli_target"
+  }
+
+  # ──────────────────────────────────────────────────────────
   # LAUNCH
   # ──────────────────────────────────────────────────────────
   echo ""
@@ -1034,6 +1061,10 @@ SUMMARY_EOF
     echo ""
     print_ok "Containers started!"
     echo ""
+
+    install_cli_symlink
+
+    echo ""
     echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}${BOLD}║    Your assistant is ready!                  ║${NC}"
     echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════╝${NC}"
@@ -1041,16 +1072,22 @@ SUMMARY_EOF
     echo -e "  Open Telegram and send a message to: ${BOLD}@${bot_username}${NC}"
     echo "  Send /help to see available commands."
     echo ""
-    echo "  Useful commands:"
+    echo "  Power-user CLI (works from anywhere on this machine):"
+    echo -e "    ${BOLD}opencode-assistant --status${NC}    Health snapshot"
+    echo -e "    ${BOLD}opencode-assistant --update${NC}    Smart update (auto-backup, only rebuilds what changed)"
+    echo -e "    ${BOLD}opencode-assistant --doctor${NC}    Run diagnostics if anything feels off"
+    echo -e "    ${BOLD}opencode-assistant --help${NC}      Full command list"
+    echo ""
+    echo "  Manual fallbacks:"
     echo "    View logs:    docker compose logs -f"
-    echo "    Stop:         docker compose down"
-    echo "    Update:       git pull && docker compose up -d --build"
     echo "    Reconfigure:  ./setup.sh"
     echo ""
     echo -e "  ${BOLD}Next:${NC} 5-minute walkthrough at docs/QUICK_DEMO.md"
     echo "        Troubleshooting recipes at docs/TROUBLESHOOTING.md"
     echo ""
   else
+    echo ""
+    install_cli_symlink
     echo ""
     echo "Setup complete. To launch the assistant, run:"
     echo -e "  ${BOLD}docker compose up -d${NC}"

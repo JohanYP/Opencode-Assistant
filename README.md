@@ -259,9 +259,12 @@ Guía completa y troubleshooting: [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY
 ## Actualizar
 
 ```bash
-git pull
-docker compose up -d --build
+opencode-assistant --update
 ```
+
+Smart update: hace backup automático de tu memoria y configs, detecta qué containers necesitan rebuild, y solo reconstruye lo que cambió. Los demás servicios siguen corriendo durante todo el proceso. Más detalles: [`docs/CLI_USAGE.md`](./docs/CLI_USAGE.md).
+
+Si no tienes el CLI instalado todavía (porque hiciste `git clone` antes de que existiera): `sudo ln -sf $(pwd)/bin/opencode-assistant /usr/local/bin/opencode-assistant`. O fallback manual: `git pull && docker compose up -d --build`.
 
 La memoria persiste en `./memory/` (volumen montado), las actualizaciones nunca pierden estado.
 
@@ -294,6 +297,7 @@ La memoria persiste en `./memory/` (volumen montado), las actualizaciones nunca 
 ## Documentación
 
 - [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — primeros 5 minutos
+- [`docs/CLI_USAGE.md`](./docs/CLI_USAGE.md) — manual del comando `opencode-assistant`
 - [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — cómo MCP se conecta a OpenCode
 - [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md) — guía completa de memoria vectorial
 - [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — síntoma → solución
@@ -461,9 +465,12 @@ Full guide and troubleshooting: [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.m
 ## Updating
 
 ```bash
-git pull
-docker compose up -d --build
+opencode-assistant --update
 ```
+
+Smart update: snapshots your memory + configs first, fetches origin, detects which containers actually need a rebuild, and rebuilds only those. The other services keep running through the whole flow. Full reference: [`docs/CLI_USAGE.md`](./docs/CLI_USAGE.md).
+
+If you cloned before the CLI existed and the symlink isn't installed yet: `sudo ln -sf $(pwd)/bin/opencode-assistant /usr/local/bin/opencode-assistant`. Or manual fallback: `git pull && docker compose up -d --build`.
 
 Memory persists in `./memory/` (mounted volume), so updates never lose state.
 
@@ -496,6 +503,7 @@ Memory persists in `./memory/` (mounted volume), so updates never lose state.
 ## Documentation
 
 - [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — first 5 minutes after install
+- [`docs/CLI_USAGE.md`](./docs/CLI_USAGE.md) — `opencode-assistant` command reference
 - [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — how memory tools wire into OpenCode
 - [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md) — full vector memory guide
 - [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — symptom → fix

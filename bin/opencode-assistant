@@ -1,0 +1,641 @@
+#!/usr/bin/env bash
+# opencode-assistant — power-user CLI for the Opencode-Assistant Docker install.
+#
+# Lives on the host (not inside any container). Wraps the Docker compose
+# workflow plus repo updates with sensible defaults and friendlier output.
+#
+# Usage:
+#   opencode-assistant --version
+#   opencode-assistant --update
+#   opencode-assistant --status
+#   opencode-assistant --logs [bot|opencode|workspace-mcp] [--tail N]
+#   opencode-assistant --backup
+#   opencode-assistant --restore <file.tar.gz>
+#   opencode-assistant --doctor
+#   opencode-assistant --help
+
+set -e
+
+# ─── Repo discovery ────────────────────────────────────────────────────────
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ─── Pretty output ─────────────────────────────────────────────────────────
+if [[ -t 1 ]]; then
+  BOLD=$'\033[1m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'
+  RED=$'\033[0;31m'; CYAN=$'\033[0;36m'; DIM=$'\033[2m'; NC=$'\033[0m'
+else
+  BOLD=''; GREEN=''; YELLOW=''; RED=''; CYAN=''; DIM=''; NC=''
+fi
+
+ok()   { printf "${GREEN}✓${NC} %s\n" "$1"; }
+warn() { printf "${YELLOW}⚠${NC} %s\n" "$1"; }
+err()  { printf "${RED}✗${NC} %s\n" "$1" >&2; }
+info() { printf "${CYAN}→${NC} %s\n" "$1"; }
+hdr()  { printf "\n${BOLD}%s${NC}\n" "$1"; }
+
+# ─── Helpers ───────────────────────────────────────────────────────────────
+
+require_repo() {
+  if [[ ! -f "$REPO_DIR/docker-compose.yml" ]]; then
+    err "Not in an Opencode-Assistant repo (no docker-compose.yml at $REPO_DIR)."
+    err "Re-run from inside the repo, or fix the symlink at $SCRIPT_PATH."
+    exit 2
+  fi
+}
+
+require_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    err "Docker is not installed."
+    exit 2
+  fi
+  if ! docker info >/dev/null 2>&1; then
+    err "Docker daemon is not responding (try: sudo systemctl start docker)."
+    exit 2
+  fi
+}
+
+# Run docker compose from the repo dir (so it picks up docker-compose.yml).
+dc() { (cd "$REPO_DIR" && docker compose "$@"); }
+
+# Run docker compose for the workspace-mcp side-car if its file exists.
+dc_workspace() {
+  if [[ -f "$REPO_DIR/docker-compose.workspace.yml" ]]; then
+    (cd "$REPO_DIR" && docker compose -f docker-compose.workspace.yml "$@")
+  fi
+}
+
+container_state() {
+  local service="$1"
+  local state
+  state=$(dc ps "$service" --format '{{.State}}' 2>/dev/null | head -1)
+  echo "${state:-stopped}"
+}
+
+# Read JSON-ish field from a file with grep+sed (jq-free fallback).
+pkgjson_field() {
+  local field="$1"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".$field // \"\"" "$REPO_DIR/package.json" 2>/dev/null
+  else
+    grep "\"$field\"" "$REPO_DIR/package.json" 2>/dev/null \
+      | head -1 | sed -E 's/.*"'"$field"'"\s*:\s*"([^"]*)".*/\1/'
+  fi
+}
+
+# ─── --help ────────────────────────────────────────────────────────────────
+
+cmd_help() {
+  cat <<EOF
+${BOLD}opencode-assistant${NC} — power-user CLI for the Opencode-Assistant install
+
+${BOLD}USAGE${NC}
+  opencode-assistant ${CYAN}--version${NC}              Show repo + container versions
+  opencode-assistant ${CYAN}--update${NC}               Smart update: fetch, decide what to rebuild, do it
+  opencode-assistant ${CYAN}--status${NC}               Health snapshot of all services
+  opencode-assistant ${CYAN}--logs${NC} [service]       Tail logs (service: bot|opencode|workspace-mcp)
+  opencode-assistant ${CYAN}--backup${NC}               Snapshot memory + configs to backups/
+  opencode-assistant ${CYAN}--restore${NC} <file>       Restore from a backup .tar.gz
+  opencode-assistant ${CYAN}--doctor${NC}               Run automatic diagnostics
+  opencode-assistant ${CYAN}--help${NC}                 Show this help
+
+${BOLD}EXAMPLES${NC}
+  ${DIM}# Daily update workflow${NC}
+  opencode-assistant --update
+
+  ${DIM}# When something feels off${NC}
+  opencode-assistant --doctor
+  opencode-assistant --logs bot --tail 50
+
+  ${DIM}# Before risky changes${NC}
+  opencode-assistant --backup
+
+${BOLD}REPO${NC}
+  $REPO_DIR
+EOF
+}
+
+# ─── --version ─────────────────────────────────────────────────────────────
+
+cmd_version() {
+  require_repo
+
+  local repo_version commit
+  repo_version="$(pkgjson_field version)"
+  repo_version="${repo_version:-unknown}"
+  commit=$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+  local bot_state opencode_state
+  bot_state=$(container_state bot)
+  opencode_state=$(container_state opencode)
+
+  local opencode_version="(stopped)"
+  if [[ "$opencode_state" == "running" ]]; then
+    opencode_version=$(timeout 5 dc exec -T opencode opencode --version 2>/dev/null | tail -1 | tr -d '\r' || echo "?")
+    opencode_version="${opencode_version:-?}"
+  fi
+
+  local ws_state="(not installed)"
+  local ws_version=""
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "workspace-mcp"; then
+    ws_state="running"
+    ws_version=$(timeout 5 docker exec workspace-mcp pip show workspace-mcp 2>/dev/null | grep -i ^Version | awk '{print $2}' | tr -d '\r' || echo "?")
+  fi
+
+  hdr "Opencode-Assistant v${repo_version} (commit ${commit})"
+  printf "  Bot:           %s %s\n" \
+    "$([[ $bot_state == running ]] && echo "${GREEN}✓${NC}" || echo "${RED}✗${NC}")" \
+    "$bot_state"
+  printf "  OpenCode:      %s %s\n" \
+    "$([[ $opencode_state == running ]] && echo "${GREEN}✓${NC}" || echo "${RED}✗${NC}")" \
+    "$opencode_state${opencode_version:+ (${opencode_version})}"
+  if [[ "$ws_state" == "running" ]]; then
+    printf "  Workspace MCP: ${GREEN}✓${NC} running${ws_version:+ (v${ws_version})}\n"
+  else
+    printf "  Workspace MCP: ${DIM}%s${NC}\n" "$ws_state"
+  fi
+
+  echo ""
+  if git -C "$REPO_DIR" fetch --quiet 2>/dev/null; then
+    local behind
+    behind=$(git -C "$REPO_DIR" rev-list --count HEAD..origin/main 2>/dev/null || echo "?")
+    if [[ "$behind" == "0" ]]; then
+      ok "Up to date with origin/main"
+    elif [[ "$behind" =~ ^[0-9]+$ ]]; then
+      warn "${behind} commit(s) ahead in origin/main — run \`opencode-assistant --update\`"
+    fi
+  else
+    warn "Could not check upstream (offline?)"
+  fi
+}
+
+# ─── --update ──────────────────────────────────────────────────────────────
+
+cmd_update() {
+  require_repo
+  require_docker
+  hdr "🔄 Updating Opencode-Assistant"
+
+  # 1. Backup primero
+  info "Creating safety backup..."
+  cmd_backup --quiet || warn "Backup failed; continuing anyway (you can stop with Ctrl+C)"
+
+  # 2. Fetch
+  info "Fetching origin..."
+  if ! git -C "$REPO_DIR" fetch; then
+    err "git fetch failed (offline?)"
+    return 1
+  fi
+
+  local behind
+  behind=$(git -C "$REPO_DIR" rev-list --count HEAD..origin/main 2>/dev/null || echo "0")
+  if [[ "$behind" == "0" ]]; then
+    ok "Already up to date"
+    return 0
+  fi
+
+  info "${behind} commit(s) to apply"
+
+  # 3. Detectar qué cambia
+  local changed_files
+  changed_files=$(git -C "$REPO_DIR" diff --name-only HEAD..origin/main)
+
+  local rebuild_bot=false rebuild_opencode=false rebuild_workspace=false
+  if echo "$changed_files" | grep -qE '^(src/|package(-lock)?\.json|tsconfig\.json|Dockerfile$|docker-compose\.yml$)'; then
+    rebuild_bot=true
+  fi
+  if echo "$changed_files" | grep -qE '^(Dockerfile\.opencode|docker/opencode-entrypoint\.sh)'; then
+    rebuild_opencode=true
+  fi
+  if echo "$changed_files" | grep -qE '^Dockerfile\.workspace-mcp' \
+     && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx workspace-mcp; then
+    rebuild_workspace=true
+  fi
+
+  # 4. Resumen
+  echo ""
+  echo "Changed files:"
+  echo "$changed_files" | head -10 | sed 's/^/    /'
+  if [[ $(echo "$changed_files" | wc -l) -gt 10 ]]; then
+    echo "    ... and $(($(echo "$changed_files" | wc -l) - 10)) more"
+  fi
+  echo ""
+
+  local rebuilds=()
+  $rebuild_bot && rebuilds+=("bot")
+  $rebuild_opencode && rebuilds+=("opencode")
+  $rebuild_workspace && rebuilds+=("workspace-mcp")
+
+  if [[ ${#rebuilds[@]} -eq 0 ]]; then
+    info "Will rebuild: ${DIM}none${NC} (only docs/config changed)"
+  else
+    info "Will rebuild: ${BOLD}${rebuilds[*]}${NC}"
+  fi
+
+  # 5. Pull
+  info "Pulling..."
+  if ! git -C "$REPO_DIR" pull --ff-only; then
+    err "git pull failed (local changes? Resolve and re-run.)"
+    return 1
+  fi
+
+  # 6. Rebuilds
+  if $rebuild_bot; then
+    info "Rebuilding bot..."
+    dc up -d --build bot
+  fi
+  if $rebuild_opencode; then
+    info "Rebuilding opencode..."
+    dc up -d --build opencode
+  fi
+  if $rebuild_workspace; then
+    info "Rebuilding workspace-mcp..."
+    dc_workspace up -d --build
+  fi
+
+  # 7. Healthcheck post-update
+  echo ""
+  info "Verifying health..."
+  sleep 3
+  local bot_state
+  bot_state=$(container_state bot)
+  if [[ "$bot_state" == "running" ]]; then
+    ok "Bot is running"
+  else
+    err "Bot is in state '${bot_state}' — check: opencode-assistant --logs bot"
+    return 1
+  fi
+
+  local new_version
+  new_version="$(pkgjson_field version)"
+  ok "Update complete (v${new_version})"
+}
+
+# ─── --status ──────────────────────────────────────────────────────────────
+
+cmd_status() {
+  require_repo
+  require_docker
+
+  hdr "📊 Opencode-Assistant status"
+
+  echo ""
+  echo "${BOLD}Containers:${NC}"
+  dc ps --format "table {{.Name}}\t{{.State}}\t{{.Status}}" 2>/dev/null \
+    || dc ps
+
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx workspace-mcp; then
+    echo ""
+    echo "${BOLD}Side-cars:${NC}"
+    docker ps --filter name=workspace-mcp --format "table {{.Names}}\t{{.Status}}"
+  fi
+
+  echo ""
+  echo "${BOLD}MCP connectivity (from inside opencode):${NC}"
+  if [[ "$(container_state opencode)" == "running" ]]; then
+    local check_script='
+const probes = {
+  "memory":           "http://bot:4097/mcp/",
+  "google-workspace": "http://workspace-mcp:8001/mcp/",
+};
+(async () => {
+  for (const [name, url] of Object.entries(probes)) {
+    try {
+      const r = await fetch(url);
+      console.log(`  ${name.padEnd(18)} ✓ HTTP ${r.status}`);
+    } catch (e) {
+      console.log(`  ${name.padEnd(18)} ✗ ${e.message}`);
+    }
+  }
+})();
+'
+    echo "$check_script" > /tmp/oa-mcp-check.js
+    dc cp /tmp/oa-mcp-check.js opencode:/tmp/oa-mcp-check.js >/dev/null 2>&1
+    dc exec -T opencode node /tmp/oa-mcp-check.js 2>/dev/null || warn "Probe failed"
+    rm -f /tmp/oa-mcp-check.js
+  else
+    warn "opencode container is not running; cannot probe"
+  fi
+
+  echo ""
+  echo "${BOLD}Memory:${NC}"
+  if [[ -d "$REPO_DIR/memory" ]]; then
+    local size
+    size=$(du -sh "$REPO_DIR/memory" 2>/dev/null | awk '{print $1}')
+    echo "  Path: $REPO_DIR/memory ($size)"
+    if [[ -f "$REPO_DIR/memory/data.db" ]]; then
+      local facts skills
+      facts=$(timeout 3 sqlite3 "$REPO_DIR/memory/data.db" "SELECT COUNT(*) FROM facts" 2>/dev/null || echo "?")
+      skills=$(timeout 3 sqlite3 "$REPO_DIR/memory/data.db" "SELECT COUNT(*) FROM skills" 2>/dev/null || echo "?")
+      echo "  Facts: $facts · Skills: $skills"
+    fi
+  else
+    warn "Memory directory not found"
+  fi
+
+  if [[ -d "$REPO_DIR/backups" ]]; then
+    echo ""
+    echo "${BOLD}Backups:${NC}"
+    local n size
+    n=$(find "$REPO_DIR/backups" -name '*.tar.gz' 2>/dev/null | wc -l)
+    size=$(du -sh "$REPO_DIR/backups" 2>/dev/null | awk '{print $1}')
+    echo "  $n backup(s) · $size total"
+  fi
+}
+
+# ─── --logs ────────────────────────────────────────────────────────────────
+
+cmd_logs() {
+  require_repo
+  require_docker
+
+  local service="bot"
+  local tail="100"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      bot|opencode|workspace-mcp) service="$1"; shift ;;
+      --tail) tail="$2"; shift 2 ;;
+      --tail=*) tail="${1#--tail=}"; shift ;;
+      *) err "Unknown arg for --logs: $1"; return 2 ;;
+    esac
+  done
+
+  if [[ "$service" == "workspace-mcp" ]]; then
+    docker logs -f --tail="$tail" workspace-mcp
+  else
+    dc logs -f --tail="$tail" "$service"
+  fi
+}
+
+# ─── --backup ──────────────────────────────────────────────────────────────
+
+cmd_backup() {
+  require_repo
+  require_docker
+
+  local quiet=false
+  if [[ "${1:-}" == "--quiet" ]]; then
+    quiet=true
+  fi
+
+  local timestamp backup_dir backup_file
+  timestamp=$(date +%Y%m%d-%H%M%S)
+  backup_dir="$REPO_DIR/backups"
+  backup_file="$backup_dir/opencode-assistant-$timestamp.tar.gz"
+  mkdir -p "$backup_dir"
+
+  $quiet || info "Creating backup: $backup_file"
+
+  local tmpdir
+  tmpdir=$(mktemp -d)
+
+  # 1. memory dir (bind mount)
+  if [[ -d "$REPO_DIR/memory" ]]; then
+    cp -a "$REPO_DIR/memory" "$tmpdir/memory"
+  fi
+
+  # 2. .env files
+  for f in .env .env.workspace; do
+    [[ -f "$REPO_DIR/$f" ]] && cp "$REPO_DIR/$f" "$tmpdir/$f"
+  done
+
+  # 3. Docker volumes
+  copy_volume_to_tmp() {
+    local vol="$1"; local subdir="$2"
+    if docker volume inspect "$vol" >/dev/null 2>&1; then
+      docker run --rm \
+        -v "$vol":/src:ro \
+        -v "$tmpdir":/dst \
+        alpine sh -c "cp -a /src /dst/$subdir" 2>/dev/null || true
+    fi
+  }
+  # The actual volume names are prefixed by the compose project name.
+  # Most installs use the directory name as project, so we try a couple.
+  local project="opencode-assistant"
+  copy_volume_to_tmp "${project}_opencode-config" "opencode-config"
+  copy_volume_to_tmp "workspace-mcp-data" "workspace-mcp-data"
+
+  # 4. tar
+  (cd "$tmpdir" && tar czf "$backup_file" .)
+  rm -rf "$tmpdir"
+
+  if $quiet; then
+    return 0
+  fi
+
+  local size
+  size=$(du -h "$backup_file" | awk '{print $1}')
+  ok "Backup saved: $backup_file ($size)"
+}
+
+# ─── --restore ─────────────────────────────────────────────────────────────
+
+cmd_restore() {
+  require_repo
+  require_docker
+
+  local backup_file="${1:-}"
+
+  if [[ -z "$backup_file" ]]; then
+    echo "Usage: opencode-assistant --restore <file.tar.gz>"
+    echo ""
+    echo "Available backups:"
+    if ls "$REPO_DIR/backups/"*.tar.gz >/dev/null 2>&1; then
+      ls -lh "$REPO_DIR/backups/"*.tar.gz | awk '{print "  " $9, "(" $5 ")"}'
+    else
+      echo "  (none)"
+    fi
+    return 1
+  fi
+
+  if [[ ! -f "$backup_file" ]]; then
+    err "File not found: $backup_file"
+    return 1
+  fi
+
+  warn "This will OVERWRITE current memory/, .env, and Docker volumes."
+  read -r -p "Type 'restore' to confirm: " answer
+  if [[ "$answer" != "restore" ]]; then
+    echo "Cancelled."
+    return 1
+  fi
+
+  info "Stopping containers..."
+  dc down
+  dc_workspace down 2>/dev/null || true
+
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  info "Extracting backup..."
+  tar xzf "$backup_file" -C "$tmpdir"
+
+  # Restore memory dir
+  if [[ -d "$tmpdir/memory" ]]; then
+    info "Restoring memory/..."
+    rm -rf "$REPO_DIR/memory"
+    mv "$tmpdir/memory" "$REPO_DIR/memory"
+  fi
+
+  # Restore .env files
+  for f in .env .env.workspace; do
+    if [[ -f "$tmpdir/$f" ]]; then
+      cp "$tmpdir/$f" "$REPO_DIR/$f"
+      info "Restored $f"
+    fi
+  done
+
+  # Restore volumes
+  restore_volume_from_tmp() {
+    local vol="$1"; local subdir="$2"
+    if [[ -d "$tmpdir/$subdir" ]]; then
+      docker volume create "$vol" >/dev/null
+      docker run --rm \
+        -v "$vol":/dst \
+        -v "$tmpdir/$subdir":/src:ro \
+        alpine sh -c "rm -rf /dst/* && cp -a /src/. /dst/" 2>/dev/null || warn "Volume $vol restore had warnings"
+    fi
+  }
+  local project="opencode-assistant"
+  restore_volume_from_tmp "${project}_opencode-config" "opencode-config"
+  restore_volume_from_tmp "workspace-mcp-data" "workspace-mcp-data"
+
+  rm -rf "$tmpdir"
+
+  info "Starting containers..."
+  dc up -d
+  if [[ -f "$REPO_DIR/docker-compose.workspace.yml" ]]; then
+    dc_workspace up -d
+  fi
+
+  ok "Restore complete"
+}
+
+# ─── --doctor ──────────────────────────────────────────────────────────────
+
+cmd_doctor() {
+  require_repo
+
+  hdr "🏥 Running diagnostics"
+
+  local fails=0
+  check() {
+    local label="$1"; shift
+    if "$@" >/dev/null 2>&1; then
+      ok "$label"
+    else
+      err "$label"
+      fails=$((fails + 1))
+    fi
+  }
+
+  # Docker
+  check "Docker installed" command -v docker
+  check "Docker daemon responding" docker info
+
+  # .env
+  if [[ -f "$REPO_DIR/.env" ]]; then
+    if grep -qE '^TELEGRAM_BOT_TOKEN=.+' "$REPO_DIR/.env"; then
+      ok ".env present with TELEGRAM_BOT_TOKEN"
+    else
+      err ".env exists but TELEGRAM_BOT_TOKEN is empty — run ./setup.sh"
+      fails=$((fails + 1))
+    fi
+  else
+    err ".env not found — run ./setup.sh"
+    fails=$((fails + 1))
+  fi
+
+  # Containers
+  for svc in bot opencode; do
+    if [[ "$(container_state $svc)" == "running" ]]; then
+      ok "$svc container running"
+    else
+      err "$svc container not running"
+      fails=$((fails + 1))
+    fi
+  done
+
+  # opencode.json validity (best-effort)
+  if [[ "$(container_state opencode)" == "running" ]]; then
+    if dc exec -T opencode test -f /root/.config/opencode/opencode.json >/dev/null 2>&1; then
+      if dc exec -T opencode python3 -c "import json,sys; json.load(open('/root/.config/opencode/opencode.json'))" >/dev/null 2>&1 \
+         || dc exec -T opencode node -e "JSON.parse(require('fs').readFileSync('/root/.config/opencode/opencode.json'))" >/dev/null 2>&1; then
+        ok "opencode.json is valid JSON"
+      else
+        err "opencode.json is malformed"
+        fails=$((fails + 1))
+      fi
+    fi
+  fi
+
+  # MCP connectivity (memory)
+  if [[ "$(container_state opencode)" == "running" ]]; then
+    if dc exec -T opencode node -e 'fetch("http://bot:4097/mcp/").then(r=>process.exit(r.status>=200&&r.status<500?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1; then
+      ok "opencode → memory MCP reachable"
+    else
+      err "opencode cannot reach the memory MCP"
+      fails=$((fails + 1))
+    fi
+  fi
+
+  # Embedding driver (if configured)
+  if [[ -f "$REPO_DIR/.env" ]] && grep -qE '^EMBEDDING_BASE_URL=.+' "$REPO_DIR/.env"; then
+    local emb_url
+    emb_url=$(grep -E '^EMBEDDING_BASE_URL=' "$REPO_DIR/.env" | head -1 | cut -d= -f2-)
+    if dc exec -T bot node -e "fetch('$emb_url').then(r=>process.exit(r.status>=200&&r.status<500?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+      ok "Embedding provider reachable ($emb_url)"
+    else
+      err "Embedding provider unreachable from bot ($emb_url)"
+      fails=$((fails + 1))
+    fi
+  fi
+
+  # workspace-mcp side-car (if installed)
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx workspace-mcp; then
+    if dc exec -T opencode node -e 'fetch("http://workspace-mcp:8001/mcp/").then(r=>process.exit(r.status>=200&&r.status<500?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1; then
+      ok "opencode → workspace-mcp reachable"
+    else
+      err "opencode cannot reach workspace-mcp"
+      fails=$((fails + 1))
+    fi
+
+    if docker exec workspace-mcp test -d /root/.google_workspace_mcp/credentials >/dev/null 2>&1 \
+       && [[ -n "$(docker exec workspace-mcp ls /root/.google_workspace_mcp/credentials/ 2>/dev/null)" ]]; then
+      ok "workspace-mcp has stored credentials"
+    else
+      warn "workspace-mcp credentials directory empty (OAuth not completed yet)"
+    fi
+  fi
+
+  echo ""
+  if (( fails > 0 )); then
+    err "${fails} issue(s) detected"
+    return 1
+  fi
+  ok "All checks passed"
+}
+
+# ─── Dispatch ──────────────────────────────────────────────────────────────
+
+if [[ $# -eq 0 ]]; then
+  cmd_help
+  exit 0
+fi
+
+case "$1" in
+  --version|-v)   shift; cmd_version "$@" ;;
+  --update|-u)    shift; cmd_update "$@" ;;
+  --status|-s)    shift; cmd_status "$@" ;;
+  --logs)         shift; cmd_logs "$@" ;;
+  --backup)       shift; cmd_backup "$@" ;;
+  --restore)      shift; cmd_restore "$@" ;;
+  --doctor)       shift; cmd_doctor "$@" ;;
+  --help|-h)      cmd_help ;;
+  *)
+    err "Unknown command: $1"
+    cmd_help
+    exit 2
+    ;;
+esac

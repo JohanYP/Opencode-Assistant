@@ -39,6 +39,9 @@ memory/backups/*/
 memory/.pre-sqlite-backup/
 memory/export-*/
 
+# CLI snapshot backups (`opencode-assistant --backup`)
+backups/
+
 # SQLite memory database (per-instance state)
 memory/data.db
 memory/data.db-shm
