@@ -3,7 +3,7 @@ import { getRuntimePaths } from "./runtime/paths.js";
 import { normalizeLocale, type Locale } from "./i18n/index.js";
 
 export type MessageFormatMode = "raw" | "markdown";
-export type TtsProvider = "openai" | "google" | "speechify";
+export type TtsProvider = "openai" | "google" | "speechify" | "edge";
 export type TtsDeliveryMode = "voice" | "audio";
 
 export interface AppConfig {
@@ -164,7 +164,7 @@ export function loadConfig(): AppConfig {
     return defaultValue;
   }
 
-  const VALID_TTS_PROVIDERS: TtsProvider[] = ["openai", "google", "speechify"];
+  const VALID_TTS_PROVIDERS: TtsProvider[] = ["openai", "google", "speechify", "edge"];
 
   function getOptionalTtsProviderEnvVar(key: string, defaultValue: TtsProvider): TtsProvider {
     const value = getEnvVar(key, false);
@@ -203,7 +203,13 @@ export function loadConfig(): AppConfig {
 
   const provider = getOptionalTtsProviderEnvVar("TTS_PROVIDER", "openai");
   const defaultVoice =
-    provider === "google" ? "en-US-Studio-O" : provider === "speechify" ? "henry" : "alloy";
+    provider === "google"
+      ? "en-US-Studio-O"
+      : provider === "speechify"
+        ? "henry"
+        : provider === "edge"
+          ? "en-US-AriaNeural"
+          : "alloy";
 
   cachedConfig = {
     telegram: {

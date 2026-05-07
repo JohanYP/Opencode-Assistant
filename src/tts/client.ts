@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import textToSpeech from "@google-cloud/text-to-speech";
+import { synthesizeWithEdge } from "./edge.js";
 
 const TTS_REQUEST_TIMEOUT_MS = 60_000;
 
@@ -11,6 +12,12 @@ export interface TtsResult {
 }
 
 export function isTtsConfigured(): boolean {
+  if (config.tts.provider === "edge") {
+    // Edge TTS uses the public Microsoft endpoint over WebSocket; no
+    // credentials needed. Always considered "configured" so users with
+    // an empty .env still get audio out of the box.
+    return true;
+  }
   if (config.tts.provider === "google") {
     return Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
   }
@@ -251,9 +258,22 @@ function getNotConfiguredMessage(): string {
       return "TTS is not configured: set GOOGLE_APPLICATION_CREDENTIALS for Google Cloud TTS";
     case "speechify":
       return "TTS is not configured: set SPEECHIFY_API_KEY";
+    case "edge":
+      // Should never reach here — Edge has no config requirements.
+      return "Edge TTS unavailable (unexpected configuration error)";
     default:
       return "TTS is not configured: set TTS_API_URL and TTS_API_KEY";
   }
+}
+
+async function synthesizeWithEdgeProvider(text: string): Promise<TtsResult> {
+  const voice = config.tts.voice || "en-US-AriaNeural";
+  logger.debug(`[TTS] Edge: voice=${voice}, chars=${text.length}`);
+  const buffer = await synthesizeWithEdge(text, { voice });
+  if (buffer.length === 0) {
+    throw new Error("Edge TTS returned an empty audio response");
+  }
+  return { buffer, filename: "assistant-reply.mp3", mimeType: "audio/mpeg" };
 }
 
 export async function synthesizeSpeech(text: string): Promise<TtsResult> {
@@ -274,6 +294,8 @@ export async function synthesizeSpeech(text: string): Promise<TtsResult> {
         return await synthesizeWithGoogle(input);
       case "speechify":
         return await synthesizeWithSpeechify(input);
+      case "edge":
+        return await synthesizeWithEdgeProvider(input);
       default:
         return await synthesizeWithOpenAi(input);
     }
