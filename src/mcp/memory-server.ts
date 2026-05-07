@@ -21,6 +21,8 @@ import { getEffectiveTtsConfig } from "../tts/config-resolver.js";
 import { listEdgeVoices } from "../tts/edge.js";
 import { STATIC_VOICES } from "../tts/voices.js";
 import {
+  getCurrentModel,
+  getCurrentProject,
   getUiPreferences,
   isTtsEnabled,
   setTtsEnabled,
@@ -28,6 +30,19 @@ import {
 } from "../settings/manager.js";
 import type { TtsProvider } from "../config.js";
 import { config } from "../config.js";
+import {
+  buildScheduledTask,
+  getScheduledTaskLimit,
+  TaskBuilderError,
+  type BuildSchedule,
+  type BuildTaskType,
+} from "../scheduled-task/builder.js";
+import {
+  addScheduledTask,
+  listScheduledTasks,
+  removeScheduledTask,
+} from "../scheduled-task/store.js";
+import { scheduledTaskRuntime } from "../scheduled-task/runtime.js";
 import {
   getSkill,
   installSkill,
@@ -296,6 +311,85 @@ export const MEMORY_TOOLS = [
           description: "Max voices returned (default 30, max 100).",
         },
       },
+    },
+  },
+  {
+    name: "task_create",
+    description:
+      "Create a scheduled task. Three types: 'task' runs an OpenCode prompt on schedule (needs prompt + project), 'reminder' sends a Telegram message (needs prompt only), 'backup' snapshots memory (no extra args). " +
+      "Schedule MUST be either a 5-field cron expression (e.g. '0 9 * * 1-5' for weekdays at 9am) or an ISO datetime for one-shot runs ('2026-05-08T10:00:00'). " +
+      "DO NOT pass natural language like 'every 5 minutes' — convert to cron yourself first. " +
+      "Cron schedules with intervals < 5 minutes are rejected.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: {
+          type: "string",
+          enum: ["task", "reminder", "backup"],
+        },
+        cron: {
+          type: "string",
+          description:
+            "Five-field cron expression. Use this OR runAt, not both. Example: '0 9 * * *'.",
+        },
+        runAt: {
+          type: "string",
+          description:
+            "ISO 8601 datetime for one-shot tasks. Use this OR cron. Example: '2026-05-08T10:00:00'.",
+        },
+        timezone: {
+          type: "string",
+          description:
+            "IANA timezone (e.g. 'America/Bogota'). Defaults to system timezone.",
+        },
+        prompt: {
+          type: "string",
+          description:
+            "For type=task: the prompt to send to OpenCode. For type=reminder: the message text shown to the user.",
+        },
+        scheduleSummary: {
+          type: "string",
+          description:
+            "Optional human-readable label shown in /tasklist. Defaults to a derived summary.",
+        },
+        projectId: {
+          type: "string",
+          description:
+            "OpenCode project id. Optional for type=reminder/backup; required for type=task unless a current project is selected in settings.",
+        },
+        projectWorktree: {
+          type: "string",
+          description:
+            "Filesystem path of the project worktree. Same constraints as projectId.",
+        },
+      },
+      required: ["type"],
+    },
+  },
+  {
+    name: "task_list",
+    description:
+      "List all scheduled tasks with their next run, type, schedule summary, and prompt/message.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: {
+          type: "string",
+          enum: ["task", "reminder", "backup"],
+          description: "Optional type filter.",
+        },
+      },
+    },
+  },
+  {
+    name: "task_delete",
+    description: "Cancel a scheduled task by id. Removes both the stored row and the running timer.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+      },
+      required: ["id"],
     },
   },
   {
@@ -573,6 +667,151 @@ async function executeToolCall(params: ToolCallParams | undefined): Promise<unkn
       await removeSkillFile(name);
       appendAudit("skill_removed", { name, source: "opencode_mcp" });
       return asJsonContent({ ok: true, name });
+    }
+
+    case "task_create": {
+      const type = requireString(args, "type") as BuildTaskType;
+      if (!["task", "reminder", "backup"].includes(type)) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          `type must be one of: task, reminder, backup`,
+        );
+      }
+
+      const cron =
+        args && typeof args.cron === "string" ? (args.cron as string) : undefined;
+      const runAt =
+        args && typeof args.runAt === "string" ? (args.runAt as string) : undefined;
+      const timezone =
+        args && typeof args.timezone === "string" ? (args.timezone as string) : undefined;
+      const prompt =
+        args && typeof args.prompt === "string" ? (args.prompt as string) : undefined;
+      const scheduleSummary =
+        args && typeof args.scheduleSummary === "string"
+          ? (args.scheduleSummary as string)
+          : undefined;
+      const explicitProjectId =
+        args && typeof args.projectId === "string" ? (args.projectId as string) : undefined;
+      const explicitProjectWorktree =
+        args && typeof args.projectWorktree === "string"
+          ? (args.projectWorktree as string)
+          : undefined;
+
+      if ((cron && runAt) || (!cron && !runAt)) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          "Provide exactly one of `cron` or `runAt`.",
+        );
+      }
+
+      // For type=task we need a real project + model. For reminder/backup
+      // we still pass them through (the runtime expects them on the row),
+      // but we accept the current values as fallback.
+      const project = getCurrentProject();
+      const projectId = explicitProjectId ?? project?.id;
+      const projectWorktree = explicitProjectWorktree ?? project?.worktree;
+      if (!projectId || !projectWorktree) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          "No project selected. Pass projectId + projectWorktree, or have the user run /projects first.",
+        );
+      }
+
+      const currentModel = getCurrentModel();
+      if (!currentModel) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          "No model selected. Have the user run /model first.",
+        );
+      }
+
+      // Enforce the global task limit before doing the (cheap) build.
+      const existing = listScheduledTasks();
+      if (existing.length >= getScheduledTaskLimit()) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          `Task limit reached (${existing.length}/${getScheduledTaskLimit()}). Delete an old task first.`,
+        );
+      }
+
+      const schedule: BuildSchedule = cron
+        ? { kind: "cron", cron, timezone }
+        : { kind: "once", runAt: runAt as string, timezone };
+
+      let task;
+      try {
+        task = buildScheduledTask({
+          type,
+          schedule,
+          projectId,
+          projectWorktree,
+          model: {
+            providerID: currentModel.providerID,
+            modelID: currentModel.modelID,
+            variant: currentModel.variant ?? null,
+          },
+          prompt,
+          scheduleSummary,
+        });
+      } catch (err) {
+        if (err instanceof TaskBuilderError) {
+          throw new RpcError(ErrorCode.InvalidParams, err.message);
+        }
+        throw err;
+      }
+
+      await addScheduledTask(task);
+      scheduledTaskRuntime.registerTask(task);
+      appendAudit("task_created", {
+        id: task.id,
+        type: task.type,
+        kind: task.kind,
+        nextRunAt: task.nextRunAt,
+        source: "opencode_mcp",
+      });
+
+      return asJsonContent({
+        ok: true,
+        id: task.id,
+        type: task.type,
+        scheduleSummary: task.scheduleSummary,
+        nextRunAt: task.nextRunAt,
+        kind: task.kind,
+      });
+    }
+
+    case "task_list": {
+      const filter =
+        args && typeof args.type === "string"
+          ? (args.type as BuildTaskType)
+          : undefined;
+      const all = listScheduledTasks();
+      const filtered = filter ? all.filter((t) => t.type === filter) : all;
+      return asJsonContent({
+        count: filtered.length,
+        tasks: filtered.map((t) => ({
+          id: t.id,
+          type: t.type,
+          kind: t.kind,
+          scheduleSummary: t.scheduleSummary,
+          nextRunAt: t.nextRunAt,
+          lastRunAt: t.lastRunAt,
+          lastStatus: t.lastStatus,
+          runCount: t.runCount,
+          prompt: t.prompt,
+        })),
+      });
+    }
+
+    case "task_delete": {
+      const id = requireString(args, "id");
+      const removed = await removeScheduledTask(id);
+      if (!removed) {
+        throw new RpcError(ErrorCode.InvalidParams, `Task not found: ${id}`);
+      }
+      scheduledTaskRuntime.removeTask(id);
+      appendAudit("task_deleted", { id, source: "opencode_mcp" });
+      return asJsonContent({ ok: true, id });
     }
 
     case "audit_recent": {

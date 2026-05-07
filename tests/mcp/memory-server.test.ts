@@ -103,6 +103,9 @@ describe("mcp/memory-server", () => {
           "tts_get_settings",
           "tts_set_settings",
           "tts_list_voices",
+          "task_create",
+          "task_list",
+          "task_delete",
           "audit_recent",
         ]),
       );
@@ -510,6 +513,155 @@ describe("mcp/memory-server", () => {
         await callTool("tts_list_voices", { provider: "openai", limit: 2 }),
       ) as { voices: unknown[] };
       expect(out.voices.length).toBeLessThanOrEqual(2);
+    });
+  });
+
+  describe("task tools", () => {
+    beforeEach(async () => {
+      // Tasks need a current project + model; install them via the
+      // settings manager (the MCP tool reads getCurrentProject/Model).
+      const settings = await import("../../src/settings/manager.js");
+      settings.setCurrentProject({
+        id: "proj-test",
+        worktree: "D:/Projects/Test",
+      });
+      settings.setCurrentModel({
+        providerID: "test-provider",
+        modelID: "test-model",
+        variant: undefined,
+      });
+    });
+
+    it("task_create with cron creates a task and registers it", async () => {
+      const out = decode(
+        await callTool("task_create", {
+          type: "reminder",
+          cron: "0 9 * * *",
+          prompt: "morning check",
+        }),
+      ) as { ok: boolean; id: string; type: string; nextRunAt: string };
+
+      expect(out.ok).toBe(true);
+      expect(out.type).toBe("reminder");
+      expect(out.id).toBeTruthy();
+      expect(out.nextRunAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+      // Confirm it shows up in task_list
+      const list = decode(await callTool("task_list", {})) as {
+        count: number;
+        tasks: Array<{ id: string; prompt: string }>;
+      };
+      expect(list.count).toBe(1);
+      expect(list.tasks[0].prompt).toBe("morning check");
+
+      // Cleanup so the next test starts empty
+      await callTool("task_delete", { id: out.id });
+    });
+
+    it("task_create with runAt accepts ISO datetimes in the future", async () => {
+      const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const out = decode(
+        await callTool("task_create", {
+          type: "reminder",
+          runAt: future,
+          prompt: "one-shot",
+        }),
+      ) as { ok: boolean; id: string; kind: string };
+      expect(out.ok).toBe(true);
+      expect(out.kind).toBe("once");
+
+      await callTool("task_delete", { id: out.id });
+    });
+
+    it("task_create rejects past runAt", async () => {
+      const past = new Date(Date.now() - 60 * 1000).toISOString();
+      await expect(
+        callTool("task_create", { type: "reminder", runAt: past, prompt: "late" }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    });
+
+    it("task_create rejects cron firing more often than every 5 min", async () => {
+      await expect(
+        callTool("task_create", {
+          type: "reminder",
+          cron: "*/2 * * * *",
+          prompt: "too fast",
+        }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    });
+
+    it("task_create requires exactly one of cron|runAt", async () => {
+      await expect(
+        callTool("task_create", { type: "reminder", prompt: "x" }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+
+      const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      await expect(
+        callTool("task_create", {
+          type: "reminder",
+          cron: "0 9 * * *",
+          runAt: future,
+          prompt: "x",
+        }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    });
+
+    it("task_create requires prompt for type=task and type=reminder", async () => {
+      await expect(
+        callTool("task_create", { type: "reminder", cron: "0 9 * * *" }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    });
+
+    it("task_list filters by type", async () => {
+      const r1 = decode(
+        await callTool("task_create", {
+          type: "reminder",
+          cron: "0 9 * * *",
+          prompt: "rem",
+        }),
+      ) as { id: string };
+      const r2 = decode(
+        await callTool("task_create", {
+          type: "backup",
+          cron: "0 0 * * 0",
+        }),
+      ) as { id: string };
+
+      const reminders = decode(await callTool("task_list", { type: "reminder" })) as {
+        count: number;
+      };
+      expect(reminders.count).toBe(1);
+      const backups = decode(await callTool("task_list", { type: "backup" })) as {
+        count: number;
+      };
+      expect(backups.count).toBe(1);
+
+      await callTool("task_delete", { id: r1.id });
+      await callTool("task_delete", { id: r2.id });
+    });
+
+    it("task_delete removes the row and returns ok", async () => {
+      const created = decode(
+        await callTool("task_create", {
+          type: "reminder",
+          cron: "0 9 * * *",
+          prompt: "delme",
+        }),
+      ) as { id: string };
+
+      const del = decode(await callTool("task_delete", { id: created.id })) as {
+        ok: boolean;
+      };
+      expect(del.ok).toBe(true);
+
+      const list = decode(await callTool("task_list", {})) as { count: number };
+      expect(list.count).toBe(0);
+    });
+
+    it("task_delete errors when id does not exist", async () => {
+      await expect(
+        callTool("task_delete", { id: "does-not-exist" }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
     });
   });
 
