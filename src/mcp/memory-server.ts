@@ -17,6 +17,17 @@ import {
 } from "../memory/repositories/facts.js";
 import { searchFactsByVector } from "../memory/repositories/facts-vector.js";
 import { getEmbeddingDriver } from "../memory/embedding-driver.js";
+import { getEffectiveTtsConfig } from "../tts/config-resolver.js";
+import { listEdgeVoices } from "../tts/edge.js";
+import { STATIC_VOICES } from "../tts/voices.js";
+import {
+  getUiPreferences,
+  isTtsEnabled,
+  setTtsEnabled,
+  setUiPreferences,
+} from "../settings/manager.js";
+import type { TtsProvider } from "../config.js";
+import { config } from "../config.js";
 import {
   getSkill,
   installSkill,
@@ -223,6 +234,68 @@ export const MEMORY_TOOLS = [
         name: { type: "string", description: "Skill name (slug)" },
       },
       required: ["name"],
+    },
+  },
+  {
+    name: "tts_get_settings",
+    description:
+      "Read the current TTS configuration (provider, voice, speed, enabled). Use this when the user asks 'what voice is configured?' or before changing any setting so you know the current state.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "tts_set_settings",
+    description:
+      "Update TTS settings at runtime (persists in settings.json, no restart needed). Use this when the user asks to change voice, speed, provider, or to enable/disable audio replies. " +
+      "Validate voice IDs against tts_list_voices first when possible. Edge is the recommended free, no-API-key provider.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        provider: {
+          type: "string",
+          enum: ["edge", "openai", "speechify", "google"],
+          description:
+            "Switch TTS provider. Edge is free with neural voices; the others need API keys configured in .env.",
+        },
+        voice: {
+          type: "string",
+          description:
+            "Voice ID for the chosen provider. For Edge use ShortName like 'es-ES-ElviraNeural'.",
+        },
+        speed: {
+          type: "number",
+          description: "Speed multiplier (0.5..2.0). 1.0 is normal pace.",
+        },
+        enabled: {
+          type: "boolean",
+          description: "Master on/off switch for audio replies.",
+        },
+      },
+    },
+  },
+  {
+    name: "tts_list_voices",
+    description:
+      "List voices available for a TTS provider. Edge has ~400 neural voices in 140+ locales (queried live). Other providers return a curated short list. Filter by locale prefix to narrow down (e.g. 'es' for Spanish).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        provider: {
+          type: "string",
+          enum: ["edge", "openai", "speechify", "google"],
+          description: "Provider to list. Defaults to current effective provider.",
+        },
+        locale: {
+          type: "string",
+          description: "Optional locale prefix (e.g. 'es', 'en-US') to filter voices.",
+        },
+        limit: {
+          type: "number",
+          description: "Max voices returned (default 30, max 100).",
+        },
+      },
     },
   },
   {
@@ -508,6 +581,164 @@ async function executeToolCall(params: ToolCallParams | undefined): Promise<unkn
       const limit = args && typeof args.limit === "number" ? (args.limit as number) : 50;
       const entries = getAudit({ event, limit });
       return asJsonContent({ count: entries.length, entries });
+    }
+
+    case "tts_get_settings": {
+      const eff = getEffectiveTtsConfig();
+      return asJsonContent({
+        enabled: isTtsEnabled(),
+        provider: eff.provider,
+        voice: eff.voice,
+        speed: eff.speed,
+        source: eff.source,
+      });
+    }
+
+    case "tts_set_settings": {
+      const allowed: Set<TtsProvider> = new Set([
+        "edge",
+        "openai",
+        "speechify",
+        "google",
+      ]);
+
+      const provider =
+        args && typeof args.provider === "string"
+          ? (args.provider as TtsProvider)
+          : undefined;
+      const voice =
+        args && typeof args.voice === "string" ? (args.voice as string) : undefined;
+      const speed =
+        args && typeof args.speed === "number" ? (args.speed as number) : undefined;
+      const enabled =
+        args && typeof args.enabled === "boolean" ? (args.enabled as boolean) : undefined;
+
+      if (provider !== undefined && !allowed.has(provider)) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          `Invalid provider "${provider}". Valid: edge, openai, speechify, google.`,
+        );
+      }
+
+      if (provider !== undefined) {
+        // Block silently-broken providers (no credentials) so the model
+        // doesn't pick e.g. "speechify" on an install with no key.
+        const hasCreds =
+          provider === "edge"
+            ? true
+            : provider === "google"
+              ? Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+              : provider === "speechify"
+                ? Boolean(config.tts.speechifyApiKey)
+                : Boolean(config.tts.apiUrl && config.tts.apiKey);
+        if (!hasCreds) {
+          throw new RpcError(
+            ErrorCode.InvalidParams,
+            `Provider "${provider}" has no credentials configured. Use "edge" for a free fallback.`,
+          );
+        }
+      }
+
+      if (speed !== undefined && (!Number.isFinite(speed) || speed < 0.5 || speed > 2.0)) {
+        throw new RpcError(
+          ErrorCode.InvalidParams,
+          "speed must be a finite number between 0.5 and 2.0",
+        );
+      }
+
+      if (voice !== undefined) {
+        const targetProvider = provider ?? getEffectiveTtsConfig().provider;
+        let known: string[] = [];
+        if (targetProvider === "edge") {
+          try {
+            known = (await listEdgeVoices()).map((v) => v.id);
+          } catch {
+            known = [];
+          }
+        } else if (targetProvider !== "openai") {
+          known = STATIC_VOICES[targetProvider].map((v) => v.id);
+        }
+        // openai accepts arbitrary voice ids → don't validate.
+        if (
+          targetProvider !== "openai" &&
+          known.length > 0 &&
+          !known.includes(voice)
+        ) {
+          throw new RpcError(
+            ErrorCode.InvalidParams,
+            `Voice "${voice}" not found for provider "${targetProvider}". Use tts_list_voices to discover valid IDs.`,
+          );
+        }
+      }
+
+      const current = getUiPreferences().tts ?? {};
+      const next = {
+        ...current,
+        ...(provider !== undefined ? { provider } : {}),
+        ...(voice !== undefined ? { voice } : {}),
+        ...(speed !== undefined ? { speed } : {}),
+      };
+      await setUiPreferences({ tts: next });
+
+      if (enabled !== undefined) {
+        await setTtsEnabled(enabled);
+      }
+
+      const eff = getEffectiveTtsConfig();
+      appendAudit("tts_settings_updated", {
+        provider: eff.provider,
+        voice: eff.voice,
+        speed: eff.speed,
+        enabled: isTtsEnabled(),
+        source: "opencode_mcp",
+      });
+      return asJsonContent({
+        ok: true,
+        enabled: isTtsEnabled(),
+        provider: eff.provider,
+        voice: eff.voice,
+        speed: eff.speed,
+      });
+    }
+
+    case "tts_list_voices": {
+      const provider =
+        args && typeof args.provider === "string"
+          ? (args.provider as TtsProvider)
+          : getEffectiveTtsConfig().provider;
+      const localePrefix =
+        args && typeof args.locale === "string"
+          ? (args.locale as string).toLowerCase()
+          : undefined;
+      const requestedLimit =
+        args && typeof args.limit === "number" ? (args.limit as number) : 30;
+      const limit = Math.max(1, Math.min(100, requestedLimit));
+
+      let voices: { id: string; name: string; locale: string; gender: string }[];
+      if (provider === "edge") {
+        try {
+          voices = await listEdgeVoices();
+        } catch (err) {
+          throw new RpcError(
+            ErrorCode.InternalError,
+            `Failed to fetch Edge voices: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      } else {
+        voices = STATIC_VOICES[provider];
+      }
+
+      let filtered = voices;
+      if (localePrefix) {
+        filtered = voices.filter((v) => v.locale.toLowerCase().startsWith(localePrefix));
+      }
+      const truncated = filtered.slice(0, limit);
+      return asJsonContent({
+        provider,
+        total: filtered.length,
+        returned: truncated.length,
+        voices: truncated,
+      });
     }
 
     default:

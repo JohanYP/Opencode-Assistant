@@ -120,6 +120,23 @@ export const zh: I18nDictionary = {
   "tts.not_configured": "⚠️ 语音回复暂不可用。请先设置 `TTS_API_URL` 和 `TTS_API_KEY`。",
   "tts.disabled": "🔇 已全局关闭语音回复。",
   "tts.failed": "⚠️ 生成语音回复失败。",
+  "tts.status_template":
+    "🎙 *TTS 设置*\n启用：{enabled}\n提供商：{provider}（{provider_source}）\n语音：{voice}（{voice_source}）\n语速：{speed}\n\n用法：\n  /tts on | off — 开关音频\n  /tts provider <名称> — 切换提供商（edge、openai、speechify、google）\n  /tts voice <id> — 切换语音（/tts list 查看选项）\n  /tts speed <0.5..2.0> — 更快/更慢\n  /tts list [提供商] — 列出可用语音",
+  "tts.provider_changed": "✅ TTS 提供商：{provider}",
+  "tts.provider_invalid":
+    "无效提供商。有效值：edge、openai、speechify、google",
+  "tts.provider_not_configured":
+    "提供商 {provider} 需要未配置的凭据。/tts provider edge 提供免费、无需密钥的回退。",
+  "tts.voice_changed": "✅ 语音：{voice}",
+  "tts.voice_unknown":
+    "未找到提供商 {provider} 的语音 \"{voice}\"。/tts list 查看选项。",
+  "tts.speed_changed": "✅ 语速：{speed}x。",
+  "tts.speed_invalid": "语速必须是 0.5 到 2.0 之间的数字。",
+  "tts.list_header": "🎙 {provider} 的语音：",
+  "tts.list_more":
+    "...还有 {count} 个。/tts list {provider} {locale} 按语言代码筛选。",
+  "tts.list_empty": "该提供商/区域无可用语音。",
+  "tts.error": "无法更新 TTS 设置。",
 
   "personality.updated": "✅ 个性已更新。开启新会话 (/new) 以使更改生效。",
   "personality.label": "个性",

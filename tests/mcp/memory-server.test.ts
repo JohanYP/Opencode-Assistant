@@ -100,6 +100,9 @@ describe("mcp/memory-server", () => {
           "skill_create",
           "skill_update",
           "skill_delete",
+          "tts_get_settings",
+          "tts_set_settings",
+          "tts_list_voices",
           "audit_recent",
         ]),
       );
@@ -403,6 +406,110 @@ describe("mcp/memory-server", () => {
       await expect(callTool("skill_delete", { name: "ghost" })).rejects.toMatchObject({
         code: ErrorCode.InvalidParams,
       });
+    });
+  });
+
+  describe("tts tools", () => {
+    it("tts_get_settings returns current effective config", async () => {
+      const out = decode(await callTool("tts_get_settings", {})) as {
+        provider: string;
+        voice: string;
+        speed: number;
+        enabled: boolean;
+        source: { provider: string; voice: string };
+      };
+      expect(out.provider).toBeDefined();
+      expect(out.voice).toBeDefined();
+      expect(out.speed).toBeGreaterThan(0);
+      expect(out.source.provider).toBeDefined();
+    });
+
+    it("tts_set_settings switches to edge (no creds needed)", async () => {
+      const out = decode(
+        await callTool("tts_set_settings", { provider: "edge" }),
+      ) as { ok: boolean; provider: string };
+      expect(out.ok).toBe(true);
+      expect(out.provider).toBe("edge");
+
+      // Verify persistence via tts_get_settings
+      const after = decode(await callTool("tts_get_settings", {})) as {
+        provider: string;
+        source: { provider: string };
+      };
+      expect(after.provider).toBe("edge");
+      expect(after.source.provider).toBe("override");
+    });
+
+    it("tts_set_settings rejects invalid provider", async () => {
+      await expect(
+        callTool("tts_set_settings", { provider: "fake" }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    });
+
+    it("tts_set_settings rejects out-of-range speed", async () => {
+      await expect(
+        callTool("tts_set_settings", { speed: 5 }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+      await expect(
+        callTool("tts_set_settings", { speed: 0.1 }),
+      ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    });
+
+    it("tts_set_settings with valid voice for speechify (with creds stubbed)", async () => {
+      // Speechify validates voice against the static catalog. Stub the
+      // creds so we don't get rejected by the no-credentials guard.
+      process.env.SPEECHIFY_API_KEY = "test-key";
+      resetConfigCache();
+      try {
+        const out = decode(
+          await callTool("tts_set_settings", {
+            provider: "speechify",
+            voice: "henry",
+          }),
+        ) as { ok: boolean; voice: string };
+        expect(out.ok).toBe(true);
+        expect(out.voice).toBe("henry");
+
+        // Bogus voice for the same provider rejects.
+        await expect(
+          callTool("tts_set_settings", {
+            provider: "speechify",
+            voice: "completely-fake-voice",
+          }),
+        ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+      } finally {
+        delete process.env.SPEECHIFY_API_KEY;
+        resetConfigCache();
+      }
+    });
+
+    it("tts_list_voices returns the static catalog for non-edge", async () => {
+      const out = decode(
+        await callTool("tts_list_voices", { provider: "openai" }),
+      ) as {
+        provider: string;
+        total: number;
+        voices: Array<{ id: string }>;
+      };
+      expect(out.provider).toBe("openai");
+      expect(out.total).toBeGreaterThan(0);
+      expect(out.voices.map((v) => v.id)).toContain("alloy");
+    });
+
+    it("tts_list_voices filters by locale prefix", async () => {
+      const out = decode(
+        await callTool("tts_list_voices", { provider: "google", locale: "es" }),
+      ) as { voices: Array<{ locale: string }> };
+      for (const v of out.voices) {
+        expect(v.locale.toLowerCase()).toMatch(/^es/);
+      }
+    });
+
+    it("tts_list_voices respects limit", async () => {
+      const out = decode(
+        await callTool("tts_list_voices", { provider: "openai", limit: 2 }),
+      ) as { voices: unknown[] };
+      expect(out.voices.length).toBeLessThanOrEqual(2);
     });
   });
 

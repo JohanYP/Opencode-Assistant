@@ -137,6 +137,23 @@ export const es: I18nDictionary = {
     "⚠️ Las respuestas de audio no estan disponibles. Configura primero `TTS_API_URL` y `TTS_API_KEY`.",
   "tts.disabled": "🔇 Respuestas de audio desactivadas globalmente.",
   "tts.failed": "⚠️ No se pudo generar la respuesta de audio.",
+  "tts.status_template":
+    "🎙 *Configuración de TTS*\nActivado: {enabled}\nProveedor: {provider} ({provider_source})\nVoz: {voice} ({voice_source})\nVelocidad: {speed}\n\nUso:\n  /tts on | off — activar/desactivar audio\n  /tts provider <nombre> — cambiar proveedor (edge, openai, speechify, google)\n  /tts voice <id> — cambiar voz (usa /tts list para ver opciones)\n  /tts speed <0.5..2.0> — más rápido o lento\n  /tts list [proveedor] — listar voces disponibles",
+  "tts.provider_changed": "✅ Proveedor TTS cambiado a: {provider}",
+  "tts.provider_invalid":
+    "Proveedor inválido. Válidos: edge, openai, speechify, google",
+  "tts.provider_not_configured":
+    "El proveedor {provider} requiere credenciales que no están configuradas. Usa /tts provider edge para un fallback gratis sin API key.",
+  "tts.voice_changed": "✅ Voz cambiada a: {voice}",
+  "tts.voice_unknown":
+    "Voz \"{voice}\" no encontrada para el proveedor {provider}. Usa /tts list para ver opciones.",
+  "tts.speed_changed": "✅ Velocidad cambiada a {speed}x.",
+  "tts.speed_invalid": "La velocidad debe ser un número entre 0.5 y 2.0.",
+  "tts.list_header": "🎙 Voces de {provider}:",
+  "tts.list_more":
+    "...y {count} más. Usa /tts list {provider} {locale} para filtrar por código de idioma.",
+  "tts.list_empty": "No hay voces disponibles para ese proveedor/idioma.",
+  "tts.error": "No se pudo actualizar la configuración de TTS.",
 
   "personality.updated":
     "✅ Personalidad actualizada. Abre una sesión nueva (/new) para que el cambio se aplique.",

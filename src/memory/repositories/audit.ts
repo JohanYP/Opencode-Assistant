@@ -9,7 +9,10 @@ export type AuditEvent =
   | "fact_deleted"
   | "memory_imported"
   | "memory_exported"
-  | "document_updated";
+  | "document_updated"
+  | "tts_settings_updated"
+  | "task_created"
+  | "task_deleted";
 
 export interface AuditEntry {
   id: number;

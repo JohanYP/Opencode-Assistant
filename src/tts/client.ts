@@ -2,6 +2,7 @@ import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import textToSpeech from "@google-cloud/text-to-speech";
 import { synthesizeWithEdge } from "./edge.js";
+import { getEffectiveTtsConfig } from "./config-resolver.js";
 
 const TTS_REQUEST_TIMEOUT_MS = 60_000;
 
@@ -12,16 +13,19 @@ export interface TtsResult {
 }
 
 export function isTtsConfigured(): boolean {
-  if (config.tts.provider === "edge") {
+  // Use the effective provider so a runtime override (set via /tts
+  // provider <name> or the tts_set_settings MCP tool) is honored.
+  const effective = getEffectiveTtsConfig();
+  if (effective.provider === "edge") {
     // Edge TTS uses the public Microsoft endpoint over WebSocket; no
     // credentials needed. Always considered "configured" so users with
     // an empty .env still get audio out of the box.
     return true;
   }
-  if (config.tts.provider === "google") {
+  if (effective.provider === "google") {
     return Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
   }
-  if (config.tts.provider === "speechify") {
+  if (effective.provider === "speechify") {
     return Boolean(config.tts.speechifyApiKey);
   }
   return Boolean(config.tts.apiUrl && config.tts.apiKey);
@@ -80,9 +84,9 @@ export function _resetGoogleClient(): void {
   googleClient = null;
 }
 
-async function synthesizeWithGoogle(text: string): Promise<TtsResult> {
+async function synthesizeWithGoogle(text: string, voice: string): Promise<TtsResult> {
   const client = getGoogleClient();
-  const voiceName = config.tts.voice || "en-US-Studio-O";
+  const voiceName = voice || "en-US-Studio-O";
   const languageCode = extractLanguageCode(voiceName);
 
   logger.debug(
@@ -107,11 +111,11 @@ async function synthesizeWithGoogle(text: string): Promise<TtsResult> {
   return { buffer, filename: "assistant-reply.mp3", mimeType: "audio/mpeg" };
 }
 
-async function synthesizeWithOpenAi(text: string): Promise<TtsResult> {
+async function synthesizeWithOpenAi(text: string, voice: string): Promise<TtsResult> {
   const url = `${config.tts.apiUrl}/audio/speech`;
 
   logger.debug(
-    `[TTS] OpenAI-compatible: url=${url}, model=${config.tts.model}, voice=${config.tts.voice}, chars=${text.length}`,
+    `[TTS] OpenAI-compatible: url=${url}, model=${config.tts.model}, voice=${voice}, chars=${text.length}`,
   );
 
   const controller = new AbortController();
@@ -126,7 +130,7 @@ async function synthesizeWithOpenAi(text: string): Promise<TtsResult> {
       },
       body: JSON.stringify({
         model: config.tts.model,
-        voice: config.tts.voice,
+        voice,
         input: text,
         response_format: "mp3",
       }),
@@ -157,16 +161,16 @@ async function synthesizeWithOpenAi(text: string): Promise<TtsResult> {
  * Response comes as Base64-encoded audio in a JSON body.
  * Free tier: 50,000 characters/month.
  */
-async function synthesizeWithSpeechify(text: string): Promise<TtsResult> {
+async function synthesizeWithSpeechify(text: string, voice: string): Promise<TtsResult> {
   const apiKey = config.tts.speechifyApiKey;
   if (!apiKey) {
     throw new Error("TTS is not configured: set SPEECHIFY_API_KEY");
   }
 
-  const voice = config.tts.voice || "henry";
+  const voiceId = voice || "henry";
 
   logger.debug(
-    `[TTS] Speechify: voice=${voice}, chars=${text.length}`,
+    `[TTS] Speechify: voice=${voiceId}, chars=${text.length}`,
   );
 
   const controller = new AbortController();
@@ -183,7 +187,7 @@ async function synthesizeWithSpeechify(text: string): Promise<TtsResult> {
       // makes the API reject the request with "Field voice_id is required".
       body: JSON.stringify({
         input: text,
-        voice_id: voice,
+        voice_id: voiceId,
       }),
       signal: controller.signal,
     });
@@ -252,8 +256,8 @@ export function flushTtsText(sessionId: string): string | null {
 
 // --- Public API ---
 
-function getNotConfiguredMessage(): string {
-  switch (config.tts.provider) {
+function getNotConfiguredMessage(provider: string): string {
+  switch (provider) {
     case "google":
       return "TTS is not configured: set GOOGLE_APPLICATION_CREDENTIALS for Google Cloud TTS";
     case "speechify":
@@ -266,10 +270,16 @@ function getNotConfiguredMessage(): string {
   }
 }
 
-async function synthesizeWithEdgeProvider(text: string): Promise<TtsResult> {
-  const voice = config.tts.voice || "en-US-AriaNeural";
-  logger.debug(`[TTS] Edge: voice=${voice}, chars=${text.length}`);
-  const buffer = await synthesizeWithEdge(text, { voice });
+async function synthesizeWithEdgeProvider(
+  text: string,
+  voice: string,
+  speed: number,
+): Promise<TtsResult> {
+  logger.debug(`[TTS] Edge: voice=${voice}, speed=${speed}, chars=${text.length}`);
+  const buffer = await synthesizeWithEdge(text, {
+    voice: voice || "en-US-AriaNeural",
+    rate: speed,
+  });
   if (buffer.length === 0) {
     throw new Error("Edge TTS returned an empty audio response");
   }
@@ -277,8 +287,10 @@ async function synthesizeWithEdgeProvider(text: string): Promise<TtsResult> {
 }
 
 export async function synthesizeSpeech(text: string): Promise<TtsResult> {
+  const effective = getEffectiveTtsConfig();
+
   if (!isTtsConfigured()) {
-    throw new Error(getNotConfiguredMessage());
+    throw new Error(getNotConfiguredMessage(effective.provider));
   }
 
   const raw = text.trim();
@@ -289,15 +301,15 @@ export async function synthesizeSpeech(text: string): Promise<TtsResult> {
   const input = stripMarkdownForSpeech(raw);
 
   try {
-    switch (config.tts.provider) {
+    switch (effective.provider) {
       case "google":
-        return await synthesizeWithGoogle(input);
+        return await synthesizeWithGoogle(input, effective.voice);
       case "speechify":
-        return await synthesizeWithSpeechify(input);
+        return await synthesizeWithSpeechify(input, effective.voice);
       case "edge":
-        return await synthesizeWithEdgeProvider(input);
+        return await synthesizeWithEdgeProvider(input, effective.voice, effective.speed);
       default:
-        return await synthesizeWithOpenAi(input);
+        return await synthesizeWithOpenAi(input, effective.voice);
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {

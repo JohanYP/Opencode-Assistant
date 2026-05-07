@@ -1,5 +1,6 @@
 import type { ModelInfo } from "../model/types.js";
 import { cloneScheduledTask, type ScheduledTask } from "../scheduled-task/types.js";
+import type { TtsProvider } from "../config.js";
 import path from "node:path";
 import { getRuntimePaths } from "../runtime/paths.js";
 import { logger } from "../utils/logger.js";
@@ -47,6 +48,19 @@ export interface UiPreferences {
    * testing vector recall. `null`/undefined means "use the config default".
    */
   inlineRecentFacts?: number | null;
+
+  /**
+   * Per-instance override for TTS settings. When fields here are set,
+   * they win over the corresponding env-derived `config.tts.*`. When a
+   * field is undefined or null, the env default applies. This lets the
+   * assistant change voice/provider/speed at runtime without restarts.
+   */
+  tts?: {
+    provider?: TtsProvider | null;
+    voice?: string | null;
+    /** Speed multiplier 0.5..2.0 (1.0 = normal). Stored as-is. */
+    speed?: number | null;
+  };
 }
 
 export interface Settings {
@@ -211,6 +225,8 @@ const DEFAULT_UI_PREFERENCES: Required<UiPreferences> = {
   showToolMessages: true,
   // null means "no override; let config.memory.inlineRecentFacts decide".
   inlineRecentFacts: null,
+  // Empty object means "no TTS overrides; use config.tts.* from .env".
+  tts: {},
 };
 
 export function getUiPreferences(): Required<UiPreferences> {

@@ -202,14 +202,11 @@ export function loadConfig(): AppConfig {
   }
 
   const provider = getOptionalTtsProviderEnvVar("TTS_PROVIDER", "openai");
-  const defaultVoice =
-    provider === "google"
-      ? "en-US-Studio-O"
-      : provider === "speechify"
-        ? "henry"
-        : provider === "edge"
-          ? "en-US-AriaNeural"
-          : "alloy";
+  // No hard-coded defaults here — `src/tts/voices.ts::defaultVoiceFor`
+  // and the runtime resolver (`config-resolver.ts`) decide the actual
+  // voice based on locale and any user override. Leaving voice empty
+  // when TTS_VOICE is unset lets a locale-aware default apply (e.g.
+  // Spanish locale gets a Spanish voice instead of "alloy").
 
   cachedConfig = {
     telegram: {
@@ -269,7 +266,7 @@ export function loadConfig(): AppConfig {
       speechifyApiKey: getEnvVar("SPEECHIFY_API_KEY", false),
       provider,
       model: getEnvVar("TTS_MODEL", false) || "gpt-4o-mini-tts",
-      voice: getEnvVar("TTS_VOICE", false) || defaultVoice,
+      voice: getEnvVar("TTS_VOICE", false),
       waitForIdle: getOptionalBooleanEnvVar("TTS_WAIT_FOR_IDLE", true),
       // "voice" sends a Telegram voice note (waveform UI, requires OGG/Opus
       // — we convert MP3 with ffmpeg). "audio" sends a music-player audio

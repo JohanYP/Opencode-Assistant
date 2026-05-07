@@ -130,6 +130,23 @@ export const ru: I18nDictionary = {
   "tts.not_configured": "⚠️ Аудиоответы недоступны. Сначала укажите `TTS_API_URL` и `TTS_API_KEY`.",
   "tts.disabled": "🔇 Аудиоответы выключены глобально.",
   "tts.failed": "⚠️ Не удалось создать аудиоответ.",
+  "tts.status_template":
+    "🎙 *Настройки TTS*\nВключено: {enabled}\nПровайдер: {provider} ({provider_source})\nГолос: {voice} ({voice_source})\nСкорость: {speed}\n\nИспользование:\n  /tts on | off — вкл/выкл аудио\n  /tts provider <имя> — сменить провайдера (edge, openai, speechify, google)\n  /tts voice <id> — сменить голос (/tts list для списка)\n  /tts speed <0.5..2.0> — быстрее/медленнее\n  /tts list [провайдер] — список голосов",
+  "tts.provider_changed": "✅ Провайдер TTS: {provider}",
+  "tts.provider_invalid":
+    "Недопустимый провайдер. Допустимы: edge, openai, speechify, google",
+  "tts.provider_not_configured":
+    "Провайдер {provider} требует учётные данные, которые не заданы. /tts provider edge — бесплатный fallback без ключа.",
+  "tts.voice_changed": "✅ Голос: {voice}",
+  "tts.voice_unknown":
+    "Голос \"{voice}\" не найден для провайдера {provider}. /tts list для списка.",
+  "tts.speed_changed": "✅ Скорость: {speed}x.",
+  "tts.speed_invalid": "Скорость должна быть числом от 0.5 до 2.0.",
+  "tts.list_header": "🎙 Голоса {provider}:",
+  "tts.list_more":
+    "...и ещё {count}. /tts list {provider} {locale} — фильтр по коду языка.",
+  "tts.list_empty": "Нет голосов для этого провайдера/локали.",
+  "tts.error": "Не удалось обновить настройки TTS.",
 
   "personality.updated":
     "✅ Личность обновлена. Открой новую сессию (/new), чтобы изменения применились.",

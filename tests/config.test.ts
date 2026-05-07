@@ -266,6 +266,9 @@ describe("config boolean env parsing", () => {
     expect(config.tts.apiUrl).toBe("");
     expect(config.tts.apiKey).toBe("");
     expect(config.tts.model).toBe("gpt-4o-mini-tts");
-    expect(config.tts.voice).toBe("alloy");
+    // Voice is left empty on purpose — the runtime resolver
+    // (src/tts/config-resolver.ts) picks a locale-aware default at use
+    // time so e.g. a Spanish-locale install gets a Spanish voice.
+    expect(config.tts.voice).toBe("");
   });
 });
