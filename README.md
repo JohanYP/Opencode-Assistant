@@ -119,7 +119,7 @@ Un bot de Telegram que convierte a [**OpenCode**](https://opencode.ai) en un asi
 
 ## Por qué usarlo
 
-- **No quieres pagar nada.** El modelo `big-pickle` (Claude Sonnet) viene incluido sin API key. Speechify TTS y Groq Whisper STT tienen tier gratis suficiente para uso personal. Ollama para vectores corre en tu máquina, también gratis.
+- **No quieres pagar nada.** El modelo `big-pickle` (Claude Sonnet) viene incluido sin API key. **Edge TTS** (voces neurales de Microsoft) funciona sin key ni cuota. Speechify TTS y Groq Whisper STT tienen tier gratis suficiente. Ollama para vectores corre en tu máquina, también gratis.
 - **Ya tienes skills de OpenClaw.** Pegas el `SKILL.md` en `memory/skills/` o lo instalas con `/skill_install <url>` desde GitHub — funciona igual que en Claude Desktop o el runtime de OpenClaw.
 - **Quieres tu memoria, no la de OpenAI.** SQLite local, MCP standard, exportable a markdown cuando quieras irte. Sin lock-in.
 - **Lo quieres en el celular.** Otros frameworks son CLI-only o desktop apps; este es Telegram desde el primer commit.
@@ -298,6 +298,7 @@ La memoria persiste en `./memory/` (volumen montado), las actualizaciones nunca 
 
 - [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — primeros 5 minutos
 - [`docs/CLI_USAGE.md`](./docs/CLI_USAGE.md) — manual del comando `opencode-assistant`
+- [`docs/TTS_PROVIDERS.md`](./docs/TTS_PROVIDERS.md) — Edge / Speechify / OpenAI / Google y `/tts`
 - [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — cómo MCP se conecta a OpenCode
 - [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md) — guía completa de memoria vectorial
 - [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — síntoma → solución
@@ -325,7 +326,7 @@ A Telegram bot that turns [**OpenCode**](https://opencode.ai) into a mobile-firs
 
 ## Why use it
 
-- **You don't want to pay anything.** The `big-pickle` model (Claude Sonnet) is included with no API key. Speechify TTS and Groq Whisper STT both have free tiers that cover personal use. Ollama for vectors runs locally, also free.
+- **You don't want to pay anything.** The `big-pickle` model (Claude Sonnet) is included with no API key. **Edge TTS** (Microsoft neural voices) works with no key and no quota. Speechify TTS and Groq Whisper STT have generous free tiers. Ollama for vectors runs locally, also free.
 - **You already have OpenClaw skills.** Drop a `SKILL.md` into `memory/skills/` or install one with `/skill_install <url>` from GitHub — it works the same as in Claude Desktop or the OpenClaw runtime.
 - **You want your memory, not OpenAI's.** Local SQLite, MCP standard, exportable to markdown whenever you want to leave. No lock-in.
 - **You want it on your phone.** Other frameworks are CLI-only or desktop apps; this is Telegram from commit one.
@@ -504,6 +505,7 @@ Memory persists in `./memory/` (mounted volume), so updates never lose state.
 
 - [`docs/QUICK_DEMO.md`](./docs/QUICK_DEMO.md) — first 5 minutes after install
 - [`docs/CLI_USAGE.md`](./docs/CLI_USAGE.md) — `opencode-assistant` command reference
+- [`docs/TTS_PROVIDERS.md`](./docs/TTS_PROVIDERS.md) — Edge / Speechify / OpenAI / Google + `/tts`
 - [`docs/MCP_INTEGRATION.md`](./docs/MCP_INTEGRATION.md) — how memory tools wire into OpenCode
 - [`docs/VECTOR_MEMORY.md`](./docs/VECTOR_MEMORY.md) — full vector memory guide
 - [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — symptom → fix

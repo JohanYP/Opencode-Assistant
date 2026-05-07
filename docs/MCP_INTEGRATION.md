@@ -42,17 +42,43 @@ through its native config format (top-level `mcp` key, entries with
 
 ## Tools exposed
 
+### Memory & facts
 | Tool | Description |
 |---|---|
-| `memory_read(name)` | Read `soul`, `agents`, `context`, or `session-summary`. |
-| `memory_write(name, content)` | Overwrite `context` or `session-summary`. `soul` and `agents` are read-only. |
-| `fact_add(content, category?)` | Persist a long-term fact. |
-| `fact_search(query, category?, limit?)` | Substring search over facts. |
+| `memory_read(name)` | Read `soul`, `agents`, `context`, `personality`, or `session-summary`. |
+| `memory_write(name, content)` | Overwrite `context`, `session-summary`, or `personality`. `soul`/`agents` are read-only identity. |
+| `fact_add(content, category?)` | Persist a long-term fact. Triggers a background embedding when a vector driver is configured. |
+| `fact_search(query, category?, limit?)` | Vector-ranked search when a driver is set; LIKE substring otherwise. Returns `mode` ("vector"/"like"). |
 | `fact_recent(limit?)` | Most recently updated facts. |
 | `fact_delete(id)` | Remove a fact. |
+
+### Skills
+| Tool | Description |
+|---|---|
 | `skill_list(category?)` | List installed skills with metadata. |
 | `skill_read(name)` | Full SKILL.md content for an installed skill. |
-| `audit_recent(event?, limit?)` | Recent memory audit log entries. |
+| `skill_create(name, content, description?, category?)` | Register a new skill in SQLite + write `memory/skills/<name>.md`. Errors if name is taken. |
+| `skill_update(name, content, description?, category?)` | Replace an existing skill in both SQLite and the .md file. |
+| `skill_delete(name)` | Remove a skill (SQLite row + .md file). Auxiliary files in `memory/skills/<name>/` left intact. |
+
+### TTS settings (runtime mutable)
+| Tool | Description |
+|---|---|
+| `tts_get_settings()` | Current effective config (provider, voice, speed, enabled, source of each). |
+| `tts_set_settings({provider?, voice?, speed?, enabled?})` | Persist override into `settings.json`. Validates provider (rejects unconfigured), voice catalog (when applicable), speed range. |
+| `tts_list_voices({provider?, locale?, limit?})` | Voice catalog. For `edge` it's live-fetched from Microsoft (~400 voices); other providers return curated lists. |
+
+### Scheduled tasks
+| Tool | Description |
+|---|---|
+| `task_create({type, cron|runAt, prompt?, projectId?, projectWorktree?, timezone?, scheduleSummary?})` | Create a `task` (LLM run), `reminder` (Telegram message), or `backup` (memory snapshot). Pass exactly one of `cron` or `runAt`. Cron < 5-min interval is rejected. Falls back to current project/model when not specified. |
+| `task_list({type?})` | List all scheduled tasks with their next run, last status, run count. Optional type filter. |
+| `task_delete({id})` | Cancel a task — removes the row and the running timer. |
+
+### Audit
+| Tool | Description |
+|---|---|
+| `audit_recent(event?, limit?)` | Recent memory audit log entries (skill installs, fact mutations, tts changes, task lifecycle, etc.). |
 
 ## Configuration
 
