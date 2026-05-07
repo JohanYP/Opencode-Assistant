@@ -202,6 +202,7 @@ cmd_update() {
   changed_files=$(git -C "$REPO_DIR" diff --name-only HEAD..origin/main)
 
   local rebuild_bot=false rebuild_opencode=false rebuild_workspace=false
+  local restart_opencode=false
   if echo "$changed_files" | grep -qE '^(src/|package(-lock)?\.json|tsconfig\.json|Dockerfile$|docker-compose\.yml$)'; then
     rebuild_bot=true
   fi
@@ -211,6 +212,15 @@ cmd_update() {
   if echo "$changed_files" | grep -qE '^Dockerfile\.workspace-mcp' \
      && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx workspace-mcp; then
     rebuild_workspace=true
+  fi
+
+  # The MCP server lives inside the bot container — when its tools list
+  # changes (src/mcp/*), the bot rebuild updates the server but OpenCode
+  # caches the old tool list at connect time and won't see new tools
+  # until it reconnects. Force a restart to drop the cached list.
+  # Skip when rebuild_opencode is already true (a full rebuild includes restart).
+  if echo "$changed_files" | grep -qE '^src/mcp/' && ! $rebuild_opencode; then
+    restart_opencode=true
   fi
 
   # 4. Resumen
@@ -232,6 +242,9 @@ cmd_update() {
   else
     info "Will rebuild: ${BOLD}${rebuilds[*]}${NC}"
   fi
+  if $restart_opencode; then
+    info "Will restart opencode to pick up new MCP tools"
+  fi
 
   # 5. Pull
   info "Pulling..."
@@ -252,6 +265,10 @@ cmd_update() {
   if $rebuild_workspace; then
     info "Rebuilding workspace-mcp..."
     dc_workspace up -d --build
+  fi
+  if $restart_opencode; then
+    info "Restarting opencode (MCP tool list refresh)..."
+    dc restart opencode
   fi
 
   # 7. Healthcheck post-update

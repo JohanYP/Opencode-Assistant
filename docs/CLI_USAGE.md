@@ -34,6 +34,7 @@ What it does, in order:
    - Changed `src/`, `package*.json`, `tsconfig.json`, `Dockerfile`, or `docker-compose.yml` → rebuild **bot**.
    - Changed `Dockerfile.opencode` or `docker/opencode-entrypoint.sh` → rebuild **opencode**.
    - Changed `Dockerfile.workspace-mcp` (if you have the side-car) → rebuild **workspace-mcp**.
+   - Changed `src/mcp/` (new MCP tools added) → restart **opencode** (no rebuild) so it re-fetches the tool list.
    - Anything else (docs, README, GitHub Actions) → no rebuild needed.
 4. `git pull --ff-only`.
 5. Rebuilds only the services that need it (`docker compose up -d --build <service>` for each).
