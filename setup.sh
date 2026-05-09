@@ -496,7 +496,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 1 — Bot language
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 1/10 — Bot Language"
+  print_step "STEP 1/11 — Bot Language"
 
   echo ""
   local lang_choice
@@ -524,7 +524,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 2 — Telegram Bot Token
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 2/10 — Telegram Bot Token"
+  print_step "STEP 2/11 — Telegram Bot Token"
 
   echo ""
   echo "  Create your bot with @BotFather:"
@@ -552,7 +552,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 3 — Telegram User ID
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 3/10 — Your Telegram User ID"
+  print_step "STEP 3/11 — Your Telegram User ID"
 
   echo ""
   echo "  Get your numeric user ID:"
@@ -577,7 +577,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 4 — AI Model
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 4/10 — AI Model"
+  print_step "STEP 4/11 — AI Model"
 
   echo ""
   local model_choice
@@ -632,7 +632,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 5 — TTS
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 5/10 — Text to Speech (optional)"
+  print_step "STEP 5/11 — Text to Speech (optional)"
 
   echo ""
   local tts_choice
@@ -698,7 +698,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 6 — STT
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 6/10 — Voice Messages / Speech to Text (optional)"
+  print_step "STEP 6/11 — Voice Messages / Speech to Text (optional)"
 
   echo ""
   local stt_choice
@@ -757,9 +757,51 @@ main() {
   fi
 
   # ──────────────────────────────────────────────────────────
-  # STEP 7 — Timezone
+  # STEP 7 — WhatsApp (optional second channel)
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 7/10 — Timezone (for cron jobs)"
+  print_step "STEP 7/11 — WhatsApp second channel (optional)"
+
+  echo ""
+  echo "  Run the bot on a SECOND phone number via WhatsApp, alongside Telegram."
+  echo "  Useful when you prefer chatting from WhatsApp on the go."
+  echo ""
+  echo "  ⚠ Uses Baileys, an unofficial WhatsApp Web client. Meta may ban"
+  echo "    numbers that talk to unofficial clients — use a DEDICATED number,"
+  echo "    not your main personal account."
+  echo ""
+  echo "  V1 limitations:"
+  echo "    • No model/agent picker, no /skills, no /task from WhatsApp"
+  echo "    • Permission/question dialogs still appear in Telegram"
+  echo "    • Reminders fire on BOTH channels"
+  echo ""
+
+  local whatsapp_enabled="false"
+  local whatsapp_number=""
+
+  if ask_yn "Enable WhatsApp as a second channel?" "N"; then
+    whatsapp_enabled="true"
+    echo ""
+    echo "  Enter the dedicated phone number with country code (no '+', no spaces)."
+    echo "  Example: 34666999999 for Spain, 5215511223344 for Mexico."
+    echo ""
+    while true; do
+      whatsapp_number=$(ask "WhatsApp phone number")
+      whatsapp_number="${whatsapp_number//[^0-9]/}"
+      if [[ -n "$whatsapp_number" ]] && [[ ${#whatsapp_number} -ge 8 ]]; then
+        print_ok "WhatsApp number: $whatsapp_number (you'll scan a QR on first start)"
+        break
+      else
+        print_err "Please enter a valid phone number (digits only, 8+ chars)."
+      fi
+    done
+  else
+    print_ok "WhatsApp: disabled (Telegram only)"
+  fi
+
+  # ──────────────────────────────────────────────────────────
+  # STEP 8 — Timezone
+  # ──────────────────────────────────────────────────────────
+  print_step "STEP 8/11 — Timezone (for cron jobs)"
 
   echo ""
   local detected_tz
@@ -777,9 +819,9 @@ main() {
   print_ok "Timezone: $timezone"
 
   # ──────────────────────────────────────────────────────────
-  # STEP 8 — Personality
+  # STEP 9 — Personality
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 8/10 — Assistant Personality"
+  print_step "STEP 9/11 — Assistant Personality"
 
   echo ""
   echo "  Customize your assistant's personality."
@@ -810,9 +852,9 @@ main() {
   print_ok "Personality configured for: $assistant_name"
 
   # ──────────────────────────────────────────────────────────
-  # STEP 9 — Interface options
+  # STEP 10 — Interface options
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 9/10 — Interface Options"
+  print_step "STEP 10/11 — Interface Options"
 
   echo ""
   echo "  These options control what messages appear in the chat."
@@ -840,9 +882,9 @@ main() {
   fi
 
   # ──────────────────────────────────────────────────────────
-  # STEP 10 — Skills from OpenClaw ecosystem (optional)
+  # STEP 11 — Skills from OpenClaw ecosystem (optional)
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 10/10 — OpenClaw Skills (optional)"
+  print_step "STEP 11/11 — OpenClaw Skills (optional)"
 
   echo ""
   echo "  Your assistant already includes 3 built-in skills:"
@@ -890,6 +932,11 @@ main() {
   echo "  TTS:              ${tts_provider:-disabled}"
   echo "  STT:              ${stt_api_url:-disabled}"
   echo "  STT hide text:    $stt_hide_recognized"
+  if [[ "$whatsapp_enabled" == "true" ]]; then
+    echo "  WhatsApp:         enabled (number: $whatsapp_number)"
+  else
+    echo "  WhatsApp:         disabled"
+  fi
   echo "  Timezone:         $timezone"
   echo "  Assistant name:   $assistant_name"
   echo "  Thinking msgs:    $([ "$hide_thinking" = "true" ] && echo "hidden" || echo "shown")"
@@ -950,6 +997,11 @@ $([ -n "$stt_api_url" ] && echo "STT_API_URL=${stt_api_url}" || echo "# STT_API_
 $([ -n "$stt_api_key" ] && echo "STT_API_KEY=${stt_api_key}" || echo "# STT_API_KEY=")
 $([ -n "$stt_model" ] && echo "STT_MODEL=${stt_model}" || echo "# STT_MODEL=")
 STT_HIDE_RECOGNIZED_TEXT=${stt_hide_recognized}
+
+# WhatsApp (optional second channel via Baileys — unofficial WhatsApp Web)
+WHATSAPP_ENABLED=${whatsapp_enabled}
+$([ -n "$whatsapp_number" ] && echo "WHATSAPP_ALLOWED_NUMBER=${whatsapp_number}" || echo "# WHATSAPP_ALLOWED_NUMBER=")
+# WHATSAPP_AUTH_DIR=./data/whatsapp-auth
 
 # Cron
 CRON_YML_SYNC=true
@@ -1072,6 +1124,18 @@ SUMMARY_EOF
     echo -e "  Open Telegram and send a message to: ${BOLD}@${bot_username}${NC}"
     echo "  Send /help to see available commands."
     echo ""
+
+    if [[ "$whatsapp_enabled" == "true" ]]; then
+      echo -e "  ${BOLD}WhatsApp first-time pairing:${NC}"
+      echo "    1. Wait ~10 seconds for the bot to publish the QR"
+      echo -e "    2. Run:  ${BOLD}opencode-assistant --logs bot${NC} (or docker compose logs -f bot)"
+      echo "    3. Scan the QR ASCII with the dedicated WhatsApp account"
+      echo "       (Settings → Linked Devices → Link a device)"
+      echo "    4. Once paired, send /help from that account"
+      echo "    Details: docs/WHATSAPP_SETUP.md"
+      echo ""
+    fi
+
     echo "  Power-user CLI (works from anywhere on this machine):"
     echo -e "    ${BOLD}opencode-assistant --status${NC}    Health snapshot"
     echo -e "    ${BOLD}opencode-assistant --update${NC}    Smart update (auto-backup, only rebuilds what changed)"

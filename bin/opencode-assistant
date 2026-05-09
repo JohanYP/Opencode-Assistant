@@ -98,6 +98,7 @@ ${BOLD}USAGE${NC}
   opencode-assistant ${CYAN}--backup${NC}               Snapshot memory + configs to backups/
   opencode-assistant ${CYAN}--restore${NC} <file>       Restore from a backup .tar.gz
   opencode-assistant ${CYAN}--doctor${NC}               Run automatic diagnostics
+  opencode-assistant ${CYAN}--qr${NC}                   Show the latest WhatsApp QR for pairing
   opencode-assistant ${CYAN}--help${NC}                 Show this help
 
 ${BOLD}EXAMPLES${NC}
@@ -386,6 +387,41 @@ cmd_logs() {
   fi
 }
 
+# ─── --qr ──────────────────────────────────────────────────────────────────
+# Convenience for first-time WhatsApp pairing. Prints the latest QR ASCII
+# block found in the bot logs and tails new ones so users can rescan if the
+# code rotates while they're getting the phone ready.
+
+cmd_qr() {
+  require_repo
+  require_docker
+
+  if ! grep -qE '^WHATSAPP_ENABLED=true' "$REPO_DIR/.env" 2>/dev/null; then
+    err "WhatsApp is not enabled. Run ./setup.sh and enable WhatsApp first."
+    return 1
+  fi
+
+  if [[ "$(container_state bot)" != "running" ]]; then
+    err "Bot container is not running. Start it: docker compose up -d"
+    return 1
+  fi
+
+  hdr "📱 Latest WhatsApp QR"
+  echo "  Open WhatsApp → Settings → Linked Devices → Link a device,"
+  echo "  then aim the camera at the QR below."
+  echo "  Press Ctrl+C once you've scanned."
+  echo ""
+
+  # Print last QR (or "Connected" notice) then follow new lines so any code
+  # rotation is shown live. The QR rendering uses Unicode block chars; we
+  # match the surrounding "Scan the QR" hint plus a generous after-context
+  # to cover the multi-line block.
+  dc logs --tail=200 bot 2>&1 | grep -B 30 -A 2 "Scan the QR\|Connected as" | tail -60
+  echo ""
+  echo "  ─── Tailing for new codes (Ctrl+C to stop) ───"
+  dc logs --since=1s -f bot 2>&1 | grep --line-buffered -E "WhatsApp|█|▄|▀|▐|▌|░|▒|▓"
+}
+
 # ─── --backup ──────────────────────────────────────────────────────────────
 
 cmd_backup() {
@@ -559,6 +595,22 @@ cmd_doctor() {
       err ".env exists but TELEGRAM_BOT_TOKEN is empty — run ./setup.sh"
       fails=$((fails + 1))
     fi
+
+    # WhatsApp (only validated when the user opted in)
+    if grep -qE '^WHATSAPP_ENABLED=true' "$REPO_DIR/.env"; then
+      if grep -qE '^WHATSAPP_ALLOWED_NUMBER=[0-9]{8,}' "$REPO_DIR/.env"; then
+        ok "WhatsApp enabled with allowed number"
+        # If the auth dir is empty AND the bot is up, the user hasn't paired yet.
+        if [[ "$(container_state bot)" == "running" ]] \
+           && dc exec -T bot test -d /app/data/whatsapp-auth >/dev/null 2>&1 \
+           && [[ -z "$(dc exec -T bot ls /app/data/whatsapp-auth 2>/dev/null | tr -d '\r')" ]]; then
+          warn "WhatsApp auth dir is empty — scan the QR with: opencode-assistant --logs bot"
+        fi
+      else
+        err "WHATSAPP_ENABLED=true but WHATSAPP_ALLOWED_NUMBER missing or invalid"
+        fails=$((fails + 1))
+      fi
+    fi
   else
     err ".env not found — run ./setup.sh"
     fails=$((fails + 1))
@@ -649,6 +701,7 @@ case "$1" in
   --backup)       shift; cmd_backup "$@" ;;
   --restore)      shift; cmd_restore "$@" ;;
   --doctor)       shift; cmd_doctor "$@" ;;
+  --qr)           shift; cmd_qr "$@" ;;
   --help|-h)      cmd_help ;;
   *)
     err "Unknown command: $1"
