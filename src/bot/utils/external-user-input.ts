@@ -1,4 +1,5 @@
 import type { Api, RawApi } from "grammy";
+import { config } from "../../config.js";
 import { t } from "../../i18n/index.js";
 import { escapePlainTextForTelegramMarkdownV2 } from "../../summary/formatter.js";
 import { sendBotText } from "./telegram-text.js";
@@ -60,6 +61,19 @@ export async function deliverExternalUserInputNotification({
   text,
   consumeSuppressedInput,
 }: DeliverExternalUserInputParams): Promise<boolean> {
+  // Hidden by default in V1.x — the mirror message ("👤 External user
+  // input: <quoted CLI text>") is noisy in chat and large CLI inputs
+  // routinely tripped Telegram's 4096-char limit, raising errors. Users
+  // who relied on the mirror can re-enable with HIDE_EXTERNAL_USER_INPUT=false.
+  // We still honor the suppression check below so dedup keeps working
+  // for any future paths that wrap this function.
+  if (config.bot.hideExternalUserInput) {
+    // Consume the suppression entry anyway so the dedup window doesn't
+    // drift with un-acked inputs.
+    consumeSuppressedInput(sessionId, text);
+    return false;
+  }
+
   const notification = buildExternalUserInputNotification(text);
   if (!notification || currentSessionId !== sessionId) {
     return false;

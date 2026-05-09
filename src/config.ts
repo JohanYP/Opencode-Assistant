@@ -43,6 +43,7 @@ export interface AppConfig {
     hideAssistantFooter: boolean;
     hideToolCallMessages: boolean;
     hideToolFileMessages: boolean;
+    hideExternalUserInput: boolean;
     messageFormatMode: MessageFormatMode;
   };
   files: {
@@ -273,6 +274,12 @@ export function loadConfig(): AppConfig {
       hideAssistantFooter: getOptionalBooleanEnvVar("HIDE_ASSISTANT_FOOTER", true),
       hideToolCallMessages: getOptionalBooleanEnvVar("HIDE_TOOL_CALL_MESSAGES", false),
       hideToolFileMessages: getOptionalBooleanEnvVar("HIDE_TOOL_FILE_MESSAGES", false),
+      // Default true = the "👤 External user input: <quoted text>" message that
+      // mirrors typing from the OpenCode CLI directly into Telegram is
+      // hidden. Most users find it noisy (long CLI inputs even hit
+      // Telegram's 4096-char limit and fail to send). Set to false in .env
+      // to bring the mirror back if you actually rely on it.
+      hideExternalUserInput: getOptionalBooleanEnvVar("HIDE_EXTERNAL_USER_INPUT", true),
       messageFormatMode: getOptionalMessageFormatModeEnvVar("MESSAGE_FORMAT_MODE", "markdown"),
     },
     files: {
