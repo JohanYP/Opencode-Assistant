@@ -92,7 +92,16 @@ export interface AppConfig {
   };
   whatsapp: {
     enabled: boolean;
+    // Primary JID used for OUTBOUND messages (reminders, bot-initiated
+    // notifications). Always a `<digits>@s.whatsapp.net` form derived from
+    // the first phone number in WHATSAPP_ALLOWED_NUMBER.
     allowedNumber: string;
+    // Full list of JIDs accepted for INBOUND messages. WhatsApp now uses
+    // `@lid` (Linked Identity) JIDs for some accounts, so the same human
+    // user may message the bot with `<lid>@lid` instead of the classic
+    // phone JID. Users can enumerate every identifier that should be
+    // considered "themselves" via comma-separated WHATSAPP_ALLOWED_NUMBER.
+    allowedJids: string[];
     authDir: string;
   };
 }
@@ -335,15 +344,39 @@ export function loadConfig(): AppConfig {
     })(),
     whatsapp: (() => {
       const enabled = getOptionalBooleanEnvVar("WHATSAPP_ENABLED", false);
-      const rawNumber = (getEnvVar("WHATSAPP_ALLOWED_NUMBER", false) || "").trim();
-      // Accept either a bare phone number (digits, optionally with leading "+")
-      // or a full JID. Normalize to the JID form Baileys uses internally so
-      // whitelist checks compare apples to apples.
-      const digits = rawNumber.replace(/[^\d]/g, "");
-      const allowedNumber = digits.length > 0 ? `${digits}@s.whatsapp.net` : "";
+      const rawValue = (getEnvVar("WHATSAPP_ALLOWED_NUMBER", false) || "").trim();
+
+      // Each entry can be:
+      //   - "573144748764"                       -> normalized to "<digits>@s.whatsapp.net"
+      //   - "573144748764@s.whatsapp.net"        -> kept as-is
+      //   - "92767216754914@lid"                 -> kept as-is (newer LID format)
+      //   - mixed via comma:  "573144748764,92767216754914@lid"
+      //
+      // The first phone-form entry becomes the OUTBOUND default; every
+      // entry (including LIDs) is added to allowedJids for INBOUND matching.
+      const allowedJids: string[] = [];
+      let allowedNumber = "";
+      for (const part of rawValue.split(",")) {
+        const piece = part.trim();
+        if (!piece) continue;
+        if (/^\d+@(s\.whatsapp\.net|lid)$/i.test(piece)) {
+          allowedJids.push(piece);
+          if (!allowedNumber && piece.endsWith("@s.whatsapp.net")) {
+            allowedNumber = piece;
+          }
+          continue;
+        }
+        const digits = piece.replace(/[^\d]/g, "");
+        if (digits.length === 0) continue;
+        const jid = `${digits}@s.whatsapp.net`;
+        allowedJids.push(jid);
+        if (!allowedNumber) allowedNumber = jid;
+      }
+
       return {
         enabled,
         allowedNumber,
+        allowedJids,
         authDir: getEnvVar("WHATSAPP_AUTH_DIR", false) || "./data/whatsapp-auth",
       };
     })(),
