@@ -35,6 +35,15 @@ services:
       # WHATSAPP_ENABLED=true; harmless otherwise.
       - whatsapp-auth:/app/data/whatsapp-auth
     env_file: .env
+    environment:
+      # Pin the bot's data home (settings.json, scheduled tasks, logs,
+      # service state) into /app/data which is a persistent named volume.
+      # Without this override the bot defaults to /root/.config/
+      # opencode-assistant/ — that path is INSIDE the container's
+      # writable layer, so every `docker compose up -d --build`
+      # (e.g. via `opencode-assistant --update`) wipes it and the
+      # user's scheduled tasks vanish. See src/runtime/paths.ts.
+      - OPENCODE_ASSISTANT_HOME=/app/data
     # Lets the bot reach services running on the VPS host (e.g. an
     # Ollama install for the optional vector memory). Harmless when
     # unused — it only adds a /etc/hosts alias inside the container.
