@@ -5,6 +5,8 @@ import pino from "pino";
 import {
   default as makeWASocket,
   useMultiFileAuthState,
+  fetchLatestBaileysVersion,
+  Browsers,
   DisconnectReason,
   type WASocket,
   type ConnectionState,
@@ -65,12 +67,41 @@ export async function openBaileysSession(options: SessionOptions): Promise<Baile
 
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
+  // Fetch the latest WhatsApp Web protocol version once at startup. The
+  // server rejects (HTTP 405) clients that send an outdated version tuple,
+  // and Baileys' bundled default lags behind real WhatsApp by weeks. We
+  // fall back to the bundled version only if the lookup fails (offline /
+  // GitHub down) so the bot still tries — better an attempt than a hang.
+  let waVersion: [number, number, number] | undefined;
+  try {
+    const fetched = await fetchLatestBaileysVersion();
+    waVersion = fetched.version;
+    logger.info(
+      `[WhatsApp] Using WA Web protocol version ${waVersion.join(".")}` +
+        (fetched.isLatest ? "" : " (server may have rolled out a newer one)"),
+    );
+  } catch (err) {
+    logger.warn(
+      "[WhatsApp] Could not fetch latest WA Web version, using bundled default",
+      err,
+    );
+  }
+
+  // Track repeated 405s so we don't reconnect-spam the server. After a few
+  // attempts in a row, back off a lot more (and log a clearer hint to the
+  // user that they likely need to update Baileys).
+  let consecutiveFailures = 0;
+
   const connect = async (): Promise<void> => {
     const sock = makeWASocket({
       auth: state,
       logger: baileysLogger,
       printQRInTerminal: false,
-      browser: ["Opencode-Assistant", "Chrome", "1.0"],
+      // Use the canonical browser tuple Baileys ships with — custom strings
+      // like ["Opencode-Assistant", "Chrome", "1.0"] are flagged by some
+      // versions of the WA backend and contribute to the 405 rejection.
+      browser: Browsers.ubuntu("Chrome"),
+      version: waVersion,
       generateHighQualityLinkPreview: false,
     });
 
@@ -88,6 +119,7 @@ export async function openBaileysSession(options: SessionOptions): Promise<Baile
       if (connection === "open") {
         const jid = sock.user?.id ?? "unknown";
         logger.info(`[WhatsApp] Connected as ${jid}`);
+        consecutiveFailures = 0;
         options.onOpen?.(sock);
         options.onConnected?.({ jid });
         if (firstConnectResolve) {
@@ -123,8 +155,25 @@ export async function openBaileysSession(options: SessionOptions): Promise<Baile
           return;
         }
 
+        consecutiveFailures += 1;
+        // 405 is a hard "your client is not acceptable" — usually means the
+        // bundled WA Web protocol version is stale. We already pulled the
+        // latest version above, so a persistent 405 means even GitHub's
+        // tracked version is behind: tell the user to bump Baileys.
+        if (reason === 405 && consecutiveFailures >= 3) {
+          logger.error(
+            "[WhatsApp] Repeated HTTP 405 from WhatsApp — your installed " +
+              "@whiskeysockets/baileys is too old for the current WA Web " +
+              "protocol. Run `npm install @whiskeysockets/baileys@latest` " +
+              "in the bot container, then `docker compose up -d --build bot`.",
+          );
+        }
+
+        // Cap exponential backoff at 30s to avoid hammering on transient
+        // network issues but still recover quickly when WA is back.
+        const backoffMs = Math.min(2000 * 2 ** Math.min(consecutiveFailures - 1, 4), 30_000);
         logger.warn(
-          `[WhatsApp] Connection closed (reason=${reason ?? "unknown"}), reconnecting in 2s...`,
+          `[WhatsApp] Connection closed (reason=${reason ?? "unknown"}, attempt=${consecutiveFailures}), reconnecting in ${backoffMs}ms...`,
         );
         setTimeout(() => {
           if (!stopRequested) {
@@ -132,7 +181,7 @@ export async function openBaileysSession(options: SessionOptions): Promise<Baile
               logger.error("[WhatsApp] Reconnect failed", err);
             });
           }
-        }, 2000);
+        }, backoffMs);
       }
     });
   };
