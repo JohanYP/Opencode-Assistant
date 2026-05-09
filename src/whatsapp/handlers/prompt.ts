@@ -50,7 +50,7 @@ export async function handlePromptText(
   inFlightBySession.add(session.id);
 
   try {
-    const enrichedText = await injectMemoryIntoPrompt(text, session.id);
+    const enrichedText = await injectMemoryIntoPrompt(text, session.id, { channel: "whatsapp" });
 
     const result = await opencodeClient.session.prompt({
       sessionID: session.id,

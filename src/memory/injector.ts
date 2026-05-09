@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import type { Channel } from "../messenger/channel.js";
 import { getUiPreferences } from "../settings/manager.js";
 import { logger } from "../utils/logger.js";
 import { getDocument } from "./repositories/documents.js";
@@ -39,6 +40,14 @@ export interface InjectMemoryOptions {
    * out unattended task context.
    */
   ignoreInlineFactsOverride?: boolean;
+  /**
+   * Channel the prompt is coming through. When set, the model is told
+   * about it (in every turn, as a small `[Channel: ...]` prefix) so it
+   * can adapt formatting / tone to the chat surface — WhatsApp doesn't
+   * support inline buttons or pinned messages, MarkdownV2 escapes
+   * confuse the WhatsApp renderer, etc.
+   */
+  channel?: Channel;
 }
 
 /**
@@ -59,6 +68,28 @@ async function buildFirstMessageContext(
   options: InjectMemoryOptions = {},
 ): Promise<string> {
   const parts: string[] = [];
+
+  // Channel-specific directive added at the very top so the model picks up
+  // the surface constraints before reading anything else. Only emitted for
+  // WhatsApp because Telegram is the historical default and its UI affords
+  // everything (inline buttons, pinned messages, MarkdownV2 — no special
+  // rules needed).
+  if (options.channel === "whatsapp") {
+    parts.push(
+      `<channel_directives>\n` +
+        `You are responding through WhatsApp. WhatsApp has limited formatting:\n` +
+        `- ONLY these styles render: *bold*, _italic_, ~strikethrough~, ` +
+        "`monospace`, ```code blocks```.\n" +
+        `- DO NOT use Telegram MarkdownV2 escapes (no \\*, \\_, \\[ etc.).\n` +
+        `- DO NOT propose inline buttons, callbacks, or pinned-message updates — ` +
+        `they have no equivalent here.\n` +
+        `- Replies cannot be edited or deleted by the bot, so keep responses ` +
+        `compact and self-contained. No "Working on it..." style placeholders.\n` +
+        `- Long answers will be split into multiple messages automatically; you ` +
+        `don't need to chunk them yourself.\n` +
+        `</channel_directives>`,
+    );
+  }
 
   const soul = getDocument("soul");
   if (soul && soul.content.trim()) {
@@ -188,36 +219,51 @@ async function buildFirstMessageContext(
  * @param userPrompt  The raw user prompt text
  * @param sessionId   The current OpenCode session ID
  */
+// A small `[Channel: <name>]` prefix added to EVERY turn (not just the
+// first). It lets the model re-confirm context cheaply if the same
+// session is later resumed from a different channel — e.g. you start in
+// Telegram, then continue from WhatsApp. ~6 tokens per turn; negligible.
+function buildChannelPrefix(channel: Channel | undefined): string {
+  if (!channel) return "";
+  return `[Channel: ${channel}]\n\n`;
+}
+
 export async function injectMemoryIntoPrompt(
   userPrompt: string,
   sessionId: string,
   options: InjectMemoryOptions = {},
 ): Promise<string> {
+  const channelPrefix = buildChannelPrefix(options.channel);
+
   if (!MEMORY_INJECT_ENABLED) {
-    return userPrompt;
+    return `${channelPrefix}${userPrompt}`;
   }
 
   try {
     if (isSessionInitialized(sessionId)) {
-      // Session already has context — let OpenCode handle history
-      return userPrompt;
+      // Session already has context — let OpenCode handle history. We
+      // still prepend the channel hint so the model can adapt mid-session
+      // if the user jumps from Telegram to WhatsApp on the same session.
+      return `${channelPrefix}${userPrompt}`;
     }
 
-    // First message in this session — inject full context
+    // First message in this session — inject full context (including the
+    // channel-directives block when applicable).
     const context = await buildFirstMessageContext(options);
     markSessionInitialized(sessionId);
 
     if (!context) {
-      return userPrompt;
+      return `${channelPrefix}${userPrompt}`;
     }
 
     logger.debug(`[MemoryInjector] Injecting full context for new session: ${sessionId}`);
-    return `${context}${userPrompt}`;
+    return `${context}${channelPrefix}${userPrompt}`;
   } catch (error) {
     logger.error("[MemoryInjector] Failed to inject memory context:", error);
-    // Never block the prompt on memory errors
+    // Never block the prompt on memory errors. Still surface the channel
+    // hint — it's tiny and not load-bearing on memory state.
     markSessionInitialized(sessionId);
-    return userPrompt;
+    return `${channelPrefix}${userPrompt}`;
   }
 }
 

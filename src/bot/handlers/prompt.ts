@@ -223,7 +223,9 @@ export async function processUserPrompt(
 
     // Add text part if present — inject memory context for new sessions
     if (text.trim().length > 0) {
-      const enrichedText = await injectMemoryIntoPrompt(text, currentSession.id);
+      const enrichedText = await injectMemoryIntoPrompt(text, currentSession.id, {
+        channel: "telegram",
+      });
       parts.push({ type: "text", text: enrichedText });
     }
 

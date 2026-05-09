@@ -257,6 +257,10 @@ export async function executeScheduledTask(
           // off override would leave the task with zero memory context.
           text: await injectMemoryIntoPrompt(task.prompt, session.id, {
             ignoreInlineFactsOverride: true,
+            // Scheduled tasks deliver their result through Telegram (the
+            // grammy bot owns the inline keyboard for continue/cancel).
+            // Hint the model accordingly so it formats for that surface.
+            channel: "telegram",
           }),
         },
       ],
