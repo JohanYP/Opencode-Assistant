@@ -587,29 +587,36 @@ cmd_doctor() {
   check "Docker installed" command -v docker
   check "Docker daemon responding" docker info
 
-  # .env
+  # .env — at least one channel must be configured (Telegram or WhatsApp).
+  # Each channel is checked independently; doctor reports which are active.
   if [[ -f "$REPO_DIR/.env" ]]; then
-    if grep -qE '^TELEGRAM_BOT_TOKEN=.+' "$REPO_DIR/.env"; then
-      ok ".env present with TELEGRAM_BOT_TOKEN"
-    else
-      err ".env exists but TELEGRAM_BOT_TOKEN is empty — run ./setup.sh"
-      fails=$((fails + 1))
+    local has_telegram=false has_whatsapp=false
+
+    if grep -qE '^TELEGRAM_BOT_TOKEN=.+' "$REPO_DIR/.env" \
+       && grep -qE '^TELEGRAM_ALLOWED_USER_ID=[1-9][0-9]*' "$REPO_DIR/.env"; then
+      ok "Telegram channel configured"
+      has_telegram=true
     fi
 
-    # WhatsApp (only validated when the user opted in)
     if grep -qE '^WHATSAPP_ENABLED=true' "$REPO_DIR/.env"; then
       if grep -qE '^WHATSAPP_ALLOWED_NUMBER=[0-9]{8,}' "$REPO_DIR/.env"; then
-        ok "WhatsApp enabled with allowed number"
+        ok "WhatsApp channel configured"
+        has_whatsapp=true
         # If the auth dir is empty AND the bot is up, the user hasn't paired yet.
         if [[ "$(container_state bot)" == "running" ]] \
            && dc exec -T bot test -d /app/data/whatsapp-auth >/dev/null 2>&1 \
            && [[ -z "$(dc exec -T bot ls /app/data/whatsapp-auth 2>/dev/null | tr -d '\r')" ]]; then
-          warn "WhatsApp auth dir is empty — scan the QR with: opencode-assistant --logs bot"
+          warn "WhatsApp auth dir is empty — scan the QR with: opencode-assistant --qr"
         fi
       else
         err "WHATSAPP_ENABLED=true but WHATSAPP_ALLOWED_NUMBER missing or invalid"
         fails=$((fails + 1))
       fi
+    fi
+
+    if ! $has_telegram && ! $has_whatsapp; then
+      err "No messaging channel configured — run ./setup.sh (Telegram and/or WhatsApp required)"
+      fails=$((fails + 1))
     fi
   else
     err ".env not found — run ./setup.sh"

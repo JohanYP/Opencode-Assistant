@@ -8,6 +8,10 @@ export type TtsDeliveryMode = "voice" | "audio";
 
 export interface AppConfig {
   telegram: {
+    // True when both TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_USER_ID are
+    // present and valid. When false, the Telegram bot is not started and
+    // any code path that depends on grammy must check this flag first.
+    enabled: boolean;
     token: string;
     allowedUserId: number;
     proxyUrl: string;
@@ -213,10 +217,21 @@ export function loadConfig(): AppConfig {
   // when TTS_VOICE is unset lets a locale-aware default apply (e.g.
   // Spanish locale gets a Spanish voice instead of "alloy").
 
+  // Telegram is optional now — a user can run with WhatsApp only. We treat
+  // the channel as enabled iff both the token and the allowed user id are
+  // present and parse cleanly. The "at least one channel" invariant is
+  // enforced after the full config object is built (see below).
+  const rawTelegramToken = getEnvVar("TELEGRAM_BOT_TOKEN", false).trim();
+  const rawTelegramUserId = getEnvVar("TELEGRAM_ALLOWED_USER_ID", false).trim();
+  const parsedTelegramUserId = rawTelegramUserId ? parseInt(rawTelegramUserId, 10) : NaN;
+  const telegramEnabled =
+    rawTelegramToken.length > 0 && Number.isInteger(parsedTelegramUserId) && parsedTelegramUserId > 0;
+
   cachedConfig = {
     telegram: {
-      token: getEnvVar("TELEGRAM_BOT_TOKEN"),
-      allowedUserId: parseInt(getEnvVar("TELEGRAM_ALLOWED_USER_ID"), 10),
+      enabled: telegramEnabled,
+      token: rawTelegramToken,
+      allowedUserId: telegramEnabled ? parsedTelegramUserId : 0,
       proxyUrl: getEnvVar("TELEGRAM_PROXY_URL", false),
     },
     opencode: {
@@ -333,6 +348,18 @@ export function loadConfig(): AppConfig {
       };
     })(),
   };
+
+  // Cross-channel invariant: at least one channel must be configured. This
+  // catches the case where the user disabled Telegram (left token empty)
+  // and also forgot to enable WhatsApp — without this guard the bot would
+  // happily start with no way for the user to talk to it.
+  if (!cachedConfig.telegram.enabled && !cachedConfig.whatsapp.enabled) {
+    throw new Error(
+      "No messaging channel is configured. Set TELEGRAM_BOT_TOKEN + " +
+        "TELEGRAM_ALLOWED_USER_ID, or WHATSAPP_ENABLED=true with " +
+        "WHATSAPP_ALLOWED_NUMBER, or both. Run ./setup.sh for guided setup.",
+    );
+  }
 
   return cachedConfig;
 }

@@ -81,12 +81,39 @@ function isValidHttpUrl(value: string): boolean {
 }
 
 export function validateRuntimeEnvValues(values: Record<string, string>): EnvValidationResult {
-  if (!values.TELEGRAM_BOT_TOKEN || values.TELEGRAM_BOT_TOKEN.trim().length === 0) {
-    return { isValid: false, reason: "Missing TELEGRAM_BOT_TOKEN" };
+  // Channel validation: at least one of Telegram / WhatsApp must be fully
+  // configured. The bot has no usable surface without a messaging channel,
+  // so we fail fast here rather than letting a useless container start.
+  const hasTelegram =
+    !!values.TELEGRAM_BOT_TOKEN &&
+    values.TELEGRAM_BOT_TOKEN.trim().length > 0 &&
+    isPositiveInteger(values.TELEGRAM_ALLOWED_USER_ID || "");
+
+  const hasWhatsApp =
+    (values.WHATSAPP_ENABLED || "").trim().toLowerCase() === "true" &&
+    !!values.WHATSAPP_ALLOWED_NUMBER &&
+    values.WHATSAPP_ALLOWED_NUMBER.replace(/[^\d]/g, "").length >= 8;
+
+  if (!hasTelegram && !hasWhatsApp) {
+    return {
+      isValid: false,
+      reason:
+        "No messaging channel configured. Set Telegram (TELEGRAM_BOT_TOKEN + TELEGRAM_ALLOWED_USER_ID) " +
+        "and/or WhatsApp (WHATSAPP_ENABLED=true + WHATSAPP_ALLOWED_NUMBER).",
+    };
   }
 
-  if (!isPositiveInteger(values.TELEGRAM_ALLOWED_USER_ID || "")) {
-    return { isValid: false, reason: "Invalid TELEGRAM_ALLOWED_USER_ID" };
+  // If Telegram fields are partially set we still flag the inconsistency so
+  // a typo doesn't silently fall through to WhatsApp-only mode.
+  if (
+    !hasTelegram &&
+    ((values.TELEGRAM_BOT_TOKEN && values.TELEGRAM_BOT_TOKEN.trim().length > 0) ||
+      (values.TELEGRAM_ALLOWED_USER_ID && values.TELEGRAM_ALLOWED_USER_ID.trim().length > 0))
+  ) {
+    return {
+      isValid: false,
+      reason: "TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_USER_ID must be set together (or both empty).",
+    };
   }
 
   if (!values.OPENCODE_MODEL_PROVIDER || values.OPENCODE_MODEL_PROVIDER.trim().length === 0) {

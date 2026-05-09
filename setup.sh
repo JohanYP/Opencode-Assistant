@@ -496,7 +496,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 1 — Bot language
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 1/11 — Bot Language"
+  print_step "STEP 1/12 — Bot Language"
 
   echo ""
   local lang_choice
@@ -522,62 +522,99 @@ main() {
   print_ok "Language: $bot_locale"
 
   # ──────────────────────────────────────────────────────────
-  # STEP 2 — Telegram Bot Token
+  # STEP 2 — Channels (Telegram, WhatsApp, or both)
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 2/11 — Telegram Bot Token"
+  print_step "STEP 2/12 — Messaging Channels"
 
   echo ""
-  echo "  Create your bot with @BotFather:"
-  echo "    1. Open https://t.me/BotFather in Telegram"
-  echo "    2. Send /newbot and follow the prompts"
-  echo "    3. Copy the bot token you receive"
+  echo "  The assistant talks to you over a chat app. Telegram has the richest"
+  echo "  UI (inline buttons, pinned status, /skills picker, etc.). WhatsApp"
+  echo "  is supported as a second channel via Baileys (unofficial Web client),"
+  echo "  with a more limited UI but ubiquitous reach."
   echo ""
 
-  local bot_token bot_username
-  while true; do
-    bot_token=$(ask "Paste your TELEGRAM_BOT_TOKEN")
-    if [[ -z "$bot_token" ]]; then
-      print_err "Token cannot be empty."
-      continue
-    fi
-    echo "  Validating token..."
-    if bot_username=$(validate_telegram_token "$bot_token"); then
-      print_ok "Token valid! Bot: @${bot_username}"
-      break
-    else
-      print_err "Invalid token or network error. Please check and try again."
-    fi
-  done
+  local channels_choice
+  channels_choice=$(ask_choice "Which channel(s) do you want?" \
+    "Telegram only (full features, recommended)" \
+    "Telegram + WhatsApp (both channels, richest setup)" \
+    "WhatsApp only (no Telegram — limited UI; permissions/skills/task pickers unavailable)")
+
+  local use_telegram=false
+  local use_whatsapp=false
+  case "$channels_choice" in
+    1) use_telegram=true; use_whatsapp=false ;;
+    2) use_telegram=true; use_whatsapp=true ;;
+    3) use_telegram=false; use_whatsapp=true ;;
+  esac
 
   # ──────────────────────────────────────────────────────────
-  # STEP 3 — Telegram User ID
+  # STEP 3 — Telegram Bot Token (skipped when only WhatsApp)
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 3/11 — Your Telegram User ID"
+  print_step "STEP 3/12 — Telegram Bot Token"
 
-  echo ""
-  echo "  Get your numeric user ID:"
-  echo "    1. Open https://t.me/userinfobot in Telegram"
-  echo "    2. Send any message"
-  echo "    3. Copy your numeric ID (e.g. 123456789)"
-  echo ""
-  echo "  ⚠ Only this ID will be able to interact with your bot."
-  echo ""
+  local bot_token=""
+  local bot_username=""
+  if $use_telegram; then
+    echo ""
+    echo "  Create your bot with @BotFather:"
+    echo "    1. Open https://t.me/BotFather in Telegram"
+    echo "    2. Send /newbot and follow the prompts"
+    echo "    3. Copy the bot token you receive"
+    echo ""
 
-  local user_id
-  while true; do
-    user_id=$(ask "Paste your TELEGRAM_ALLOWED_USER_ID")
-    if [[ "$user_id" =~ ^[0-9]+$ ]]; then
-      print_ok "User ID: $user_id"
-      break
-    else
-      print_err "User ID must be a number."
-    fi
-  done
+    while true; do
+      bot_token=$(ask "Paste your TELEGRAM_BOT_TOKEN")
+      if [[ -z "$bot_token" ]]; then
+        print_err "Token cannot be empty."
+        continue
+      fi
+      echo "  Validating token..."
+      if bot_username=$(validate_telegram_token "$bot_token"); then
+        print_ok "Token valid! Bot: @${bot_username}"
+        break
+      else
+        print_err "Invalid token or network error. Please check and try again."
+      fi
+    done
+  else
+    echo ""
+    echo "  (skipped — Telegram disabled in step 2)"
+  fi
+
+  # ──────────────────────────────────────────────────────────
+  # STEP 4 — Telegram User ID (skipped when only WhatsApp)
+  # ──────────────────────────────────────────────────────────
+  print_step "STEP 4/12 — Your Telegram User ID"
+
+  local user_id=""
+  if $use_telegram; then
+    echo ""
+    echo "  Get your numeric user ID:"
+    echo "    1. Open https://t.me/userinfobot in Telegram"
+    echo "    2. Send any message"
+    echo "    3. Copy your numeric ID (e.g. 123456789)"
+    echo ""
+    echo "  ⚠ Only this ID will be able to interact with your bot."
+    echo ""
+
+    while true; do
+      user_id=$(ask "Paste your TELEGRAM_ALLOWED_USER_ID")
+      if [[ "$user_id" =~ ^[0-9]+$ ]]; then
+        print_ok "User ID: $user_id"
+        break
+      else
+        print_err "User ID must be a number."
+      fi
+    done
+  else
+    echo ""
+    echo "  (skipped — Telegram disabled in step 2)"
+  fi
 
   # ──────────────────────────────────────────────────────────
   # STEP 4 — AI Model
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 4/11 — AI Model"
+  print_step "STEP 5/12 — AI Model"
 
   echo ""
   local model_choice
@@ -632,7 +669,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 5 — TTS
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 5/11 — Text to Speech (optional)"
+  print_step "STEP 6/12 — Text to Speech (optional)"
 
   echo ""
   local tts_choice
@@ -698,7 +735,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 6 — STT
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 6/11 — Voice Messages / Speech to Text (optional)"
+  print_step "STEP 7/12 — Voice Messages / Speech to Text (optional)"
 
   echo ""
   local stt_choice
@@ -759,31 +796,31 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 7 — WhatsApp (optional second channel)
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 7/11 — WhatsApp second channel (optional)"
-
-  echo ""
-  echo "  Run the bot on a SECOND phone number via WhatsApp, alongside Telegram."
-  echo "  Useful when you prefer chatting from WhatsApp on the go."
-  echo ""
-  echo "  ⚠ Uses Baileys, an unofficial WhatsApp Web client. Meta may ban"
-  echo "    numbers that talk to unofficial clients — use a DEDICATED number,"
-  echo "    not your main personal account."
-  echo ""
-  echo "  V1 limitations:"
-  echo "    • No model/agent picker, no /skills, no /task from WhatsApp"
-  echo "    • Permission/question dialogs still appear in Telegram"
-  echo "    • Reminders fire on BOTH channels"
-  echo ""
+  print_step "STEP 8/12 — WhatsApp number"
 
   local whatsapp_enabled="false"
   local whatsapp_number=""
 
-  if ask_yn "Enable WhatsApp as a second channel?" "N"; then
-    whatsapp_enabled="true"
+  if $use_whatsapp; then
+    echo ""
+    echo "  ⚠ Uses Baileys, an unofficial WhatsApp Web client. Meta may ban"
+    echo "    numbers that talk to unofficial clients — use a DEDICATED number,"
+    echo "    not your main personal account."
+    echo ""
+    echo "  Limitations:"
+    echo "    • Permission/question dialogs not yet mirrored to WhatsApp"
+    if ! $use_telegram; then
+      echo "    • Scheduled tasks (/task) require Telegram, unavailable in WhatsApp-only mode"
+      echo "    • No model/agent/variant pickers, /skills, /commands, /projects from WhatsApp"
+    else
+      echo "    • Pickers (model/agent/skills/projects) live in Telegram"
+    fi
     echo ""
     echo "  Enter the dedicated phone number with country code (no '+', no spaces)."
     echo "  Example: 34666999999 for Spain, 5215511223344 for Mexico."
     echo ""
+
+    whatsapp_enabled="true"
     while true; do
       whatsapp_number=$(ask "WhatsApp phone number")
       whatsapp_number="${whatsapp_number//[^0-9]/}"
@@ -795,13 +832,14 @@ main() {
       fi
     done
   else
-    print_ok "WhatsApp: disabled (Telegram only)"
+    echo ""
+    echo "  (skipped — WhatsApp disabled in step 2)"
   fi
 
   # ──────────────────────────────────────────────────────────
   # STEP 8 — Timezone
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 8/11 — Timezone (for cron jobs)"
+  print_step "STEP 9/12 — Timezone (for cron jobs)"
 
   echo ""
   local detected_tz
@@ -821,7 +859,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 9 — Personality
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 9/11 — Assistant Personality"
+  print_step "STEP 10/12 — Assistant Personality"
 
   echo ""
   echo "  Customize your assistant's personality."
@@ -854,7 +892,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 10 — Interface options
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 10/11 — Interface Options"
+  print_step "STEP 11/12 — Interface Options"
 
   echo ""
   echo "  These options control what messages appear in the chat."
@@ -884,7 +922,7 @@ main() {
   # ──────────────────────────────────────────────────────────
   # STEP 11 — Skills from OpenClaw ecosystem (optional)
   # ──────────────────────────────────────────────────────────
-  print_step "STEP 11/11 — OpenClaw Skills (optional)"
+  print_step "STEP 12/12 — OpenClaw Skills (optional)"
 
   echo ""
   echo "  Your assistant already includes 3 built-in skills:"
@@ -926,17 +964,20 @@ main() {
   echo -e "${BOLD}  Configuration Summary${NC}"
   echo "  ─────────────────────────────────────────"
   echo "  Bot language:     $bot_locale"
-  echo "  Bot token:        ${bot_token:0:10}... (@${bot_username})"
-  echo "  User ID:          $user_id"
-  echo "  AI model:         $model_provider/$model_id"
-  echo "  TTS:              ${tts_provider:-disabled}"
-  echo "  STT:              ${stt_api_url:-disabled}"
-  echo "  STT hide text:    $stt_hide_recognized"
-  if [[ "$whatsapp_enabled" == "true" ]]; then
+  if $use_telegram; then
+    echo "  Telegram:         enabled (@${bot_username}, user ${user_id})"
+  else
+    echo "  Telegram:         disabled"
+  fi
+  if $use_whatsapp; then
     echo "  WhatsApp:         enabled (number: $whatsapp_number)"
   else
     echo "  WhatsApp:         disabled"
   fi
+  echo "  AI model:         $model_provider/$model_id"
+  echo "  TTS:              ${tts_provider:-disabled}"
+  echo "  STT:              ${stt_api_url:-disabled}"
+  echo "  STT hide text:    $stt_hide_recognized"
   echo "  Timezone:         $timezone"
   echo "  Assistant name:   $assistant_name"
   echo "  Thinking msgs:    $([ "$hide_thinking" = "true" ] && echo "hidden" || echo "shown")"
@@ -961,7 +1002,7 @@ main() {
 # Generated by setup.sh on $(date)
 # ─────────────────────────────────────────────────
 
-# Telegram
+# Telegram (leave empty to run in WhatsApp-only mode)
 TELEGRAM_BOT_TOKEN=${bot_token}
 TELEGRAM_ALLOWED_USER_ID=${user_id}
 

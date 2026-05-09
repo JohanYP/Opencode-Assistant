@@ -1,6 +1,16 @@
-# WhatsApp setup (optional second channel)
+# WhatsApp setup
 
-The bot can connect to WhatsApp as a second channel alongside Telegram, using a **separate dedicated phone number**. Opt-in, disabled by default.
+Opencode-Assistant can run with WhatsApp as a **second channel alongside Telegram** or as the **only channel** (no Telegram). Both modes use [Baileys](https://github.com/WhiskeySockets/Baileys), an unofficial WhatsApp Web client, and require a **dedicated phone number** — see the warnings below.
+
+## Available modes
+
+| Mode | When to choose it |
+|---|---|
+| **Telegram only** (default) | Best UX: inline pickers, pinned status, `/skills`, `/projects`, `/task`, etc. all work |
+| **Telegram + WhatsApp** | Talk to the bot from either app; reminders fire on both. Telegram remains where permission/question dialogs appear |
+| **WhatsApp only** | No Telegram account needed. More limited UX (see below) |
+
+The wizard's `STEP 2/12 — Messaging Channels` asks which mode you want before collecting the relevant credentials.
 
 ## What works in V1
 
@@ -13,13 +23,21 @@ The bot can connect to WhatsApp as a second channel alongside Telegram, using a 
 - ✅ Numbered-menu reply for `/sessions` (reply with `1`, `2`, ...)
 - ✅ Reminders and weekly memory backup notifications fire on **both** channels (Telegram + WhatsApp), driven by a multi-target registry in `cron/reminder.ts`
 
-## Known V1 limitations
+## Known V1 limitations (apply to all modes)
 
-- ⚠️ **Permission and question dialogs still live in Telegram.** When a prompt sent from WhatsApp triggers a permission request (bash, edit, webfetch...) or a question, the dialog appears in Telegram. Approve there and the WhatsApp prompt completes. If you don't have a Telegram device handy, the prompt will block until it times out. Mirroring these dialogs to WhatsApp as numbered menus is on the V1.x roadmap (requires SSE fanout + dual state managers).
 - ⚠️ **No streaming responses** — WhatsApp users see the final reply only, not intermediate tool-call updates. The bot uses `session.prompt` (sync) instead of `promptAsync` + SSE.
 - ⚠️ **Audio output is plain MP3, not push-to-talk** (no waveform UI). PTT requires OPUS encoding which would need ffmpeg in the container; deferred to V1.x.
-- ⚠️ **No model/agent/variant pickers, no `/skills`, no `/projects`, no `/task`** from WhatsApp. Use Telegram for those.
+- ⚠️ **No model/agent/variant pickers, no `/skills`, no `/projects`, no `/task`** from WhatsApp. Use Telegram for those when running in mixed mode.
 - ⚠️ **Concurrent prompts on the same session are rejected** with a "previous task is still running" hint.
+
+## WhatsApp-only mode — extra limitations
+
+When you choose "WhatsApp only" in the wizard, **no Telegram bot is started**. That means:
+
+- ❌ **Scheduled tasks (`/task`) are unavailable.** They require Telegram-rendered output (inline keyboards for continue/cancel buttons). Reminders that don't run an OpenCode session still work via the cron registry.
+- ❌ **Permission and question dialogs from OpenCode have no UI surface.** A prompt that triggers `bash`/`edit`/`webfetch` permission will hang. Either skip prompts that need permissions, or run in mixed mode and approve from Telegram.
+
+In **mixed mode** (Telegram + WhatsApp), permission/question dialogs still appear in Telegram even when the prompt was sent from WhatsApp. Approve there and the WhatsApp prompt completes. Mirroring those dialogs to WhatsApp as numbered menus is on the V1.x roadmap.
 
 ## Requirements
 
@@ -31,12 +49,19 @@ The bot can connect to WhatsApp as a second channel alongside Telegram, using a 
 In `.env`:
 
 ```bash
+# Telegram (leave empty for WhatsApp-only mode)
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_ALLOWED_USER_ID=
+
+# WhatsApp
 WHATSAPP_ENABLED=true
 WHATSAPP_ALLOWED_NUMBER=34666999999    # country code + number, no +
 # WHATSAPP_AUTH_DIR=./data/whatsapp-auth   # default; rarely overridden
 ```
 
 `WHATSAPP_ALLOWED_NUMBER` accepts either bare digits (`34666999999`) or full Baileys JID (`34666999999@s.whatsapp.net`). The bot normalizes both.
+
+**At least one channel must be configured** — empty Telegram fields + `WHATSAPP_ENABLED=false` is rejected at startup.
 
 ## First start
 

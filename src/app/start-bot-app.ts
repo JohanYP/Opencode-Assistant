@@ -68,7 +68,17 @@ export async function startBotApp(): Promise<void> {
   if (logFilePath) {
     logger.info(`Logs are written to ${logFilePath}`);
   }
-  logger.info(`Allowed User ID: ${config.telegram.allowedUserId}`);
+  // Channel modes are explicit so users see at a glance which surfaces are
+  // active. "WhatsApp-only" is a supported mode as of v1.x — Telegram is
+  // optional but at least one channel must be configured (validated in
+  // src/config.ts).
+  if (config.telegram.enabled && config.whatsapp.enabled) {
+    logger.info(`Channels: Telegram (user ${config.telegram.allowedUserId}) + WhatsApp`);
+  } else if (config.telegram.enabled) {
+    logger.info(`Channels: Telegram only (user ${config.telegram.allowedUserId})`);
+  } else {
+    logger.info("Channels: WhatsApp only (Telegram not configured)");
+  }
   logger.debug(`[Runtime] Application start mode: ${mode}`);
 
   await loadSettings();
@@ -130,9 +140,17 @@ export async function startBotApp(): Promise<void> {
   // mid-session the next new session will receive the updated summary.
   startMemorySummaryWatcher();
 
-  const bot = createBot();
-  setReminderBot(bot);
-  await scheduledTaskRuntime.initialize(bot);
+  // Telegram bot is now optional — only create it when configured.
+  const telegramBot = config.telegram.enabled ? createBot() : null;
+  if (telegramBot) {
+    setReminderBot(telegramBot);
+    await scheduledTaskRuntime.initialize(telegramBot);
+  } else {
+    logger.info(
+      "[App] Telegram disabled — scheduled task delivery is unavailable in this mode. " +
+        "Reminders still fire on the WhatsApp channel via cron/reminder.ts.",
+    );
+  }
   await startCronYmlSync();
 
   // WhatsApp is a second optional channel. start() handles the disabled
@@ -157,6 +175,14 @@ export async function startBotApp(): Promise<void> {
   let shutdownStarted = false;
   let serviceStateCleared = false;
   let shutdownTimeout: ReturnType<typeof setTimeout> | null = null;
+  // When running WhatsApp-only there's no `bot.start()` blocking call to
+  // keep the process alive. We use this promise as the main-loop instead:
+  // it resolves when the shutdown handler fires, mirroring how grammy's
+  // long-polling exits when bot.stop() is called.
+  let resolveStandaloneRun: (() => void) | null = null;
+  const standaloneRunComplete = new Promise<void>((resolve) => {
+    resolveStandaloneRun = resolve;
+  });
 
   const clearManagedServiceState = async (): Promise<void> => {
     if (!isServiceChildProcess() || serviceStateCleared) {
@@ -211,11 +237,17 @@ export async function startBotApp(): Promise<void> {
     }, SHUTDOWN_TIMEOUT_MS);
     shutdownTimeout.unref?.();
 
-    try {
-      bot.stop();
-    } catch (error) {
-      logger.warn("[App] Failed to stop Telegram bot cleanly", error);
+    if (telegramBot) {
+      try {
+        telegramBot.stop();
+      } catch (error) {
+        logger.warn("[App] Failed to stop Telegram bot cleanly", error);
+      }
     }
+
+    // Unblock the standalone main-loop (no-op in Telegram mode).
+    resolveStandaloneRun?.();
+    resolveStandaloneRun = null;
 
     void clearManagedServiceState().catch((error) => {
       logger.warn("[App] Failed to clear managed service state", error);
@@ -227,19 +259,33 @@ export async function startBotApp(): Promise<void> {
   process.on("SIGINT", handleSigint);
   process.on("SIGTERM", handleSigterm);
 
-  const webhookInfo = await bot.api.getWebhookInfo();
-  if (webhookInfo.url) {
-    logger.info(`[Bot] Webhook detected: ${webhookInfo.url}, removing...`);
-    await bot.api.deleteWebhook();
-    logger.info("[Bot] Webhook removed, switching to long polling");
+  if (telegramBot) {
+    const webhookInfo = await telegramBot.api.getWebhookInfo();
+    if (webhookInfo.url) {
+      logger.info(`[Bot] Webhook detected: ${webhookInfo.url}, removing...`);
+      await telegramBot.api.deleteWebhook();
+      logger.info("[Bot] Webhook removed, switching to long polling");
+    }
   }
 
   try {
-    await bot.start({
-      onStart: (botInfo) => {
-        logger.info(`Bot @${botInfo.username} started!`);
-      },
-    });
+    if (telegramBot) {
+      // Telegram path: long-poll until bot.stop() is called by shutdown().
+      await telegramBot.start({
+        onStart: (botInfo) => {
+          logger.info(`Bot @${botInfo.username} started!`);
+        },
+      });
+    } else {
+      // WhatsApp-only path: WhatsApp's start() returns once Baileys is
+      // connected (it's not blocking). Block here on a Promise resolved by
+      // the shutdown handler so the process keeps responding to signals
+      // while Baileys runs in the background. Without this the process
+      // would exit cleanly the moment startBotApp() returned, killing
+      // the WhatsApp socket.
+      logger.info("[App] WhatsApp-only mode: running until SIGINT/SIGTERM.");
+      await standaloneRunComplete;
+    }
   } finally {
     process.off("SIGINT", handleSigint);
     process.off("SIGTERM", handleSigterm);

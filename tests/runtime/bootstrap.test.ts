@@ -39,6 +39,54 @@ describe("runtime/bootstrap", () => {
     expect(result.reason).toContain("TELEGRAM_ALLOWED_USER_ID");
   });
 
+  it("accepts WhatsApp-only configuration without Telegram", () => {
+    const result = validateRuntimeEnvValues({
+      WHATSAPP_ENABLED: "true",
+      WHATSAPP_ALLOWED_NUMBER: "34666999999",
+      OPENCODE_MODEL_PROVIDER: "opencode",
+      OPENCODE_MODEL_ID: "big-pickle",
+    });
+
+    expect(result).toEqual({ isValid: true });
+  });
+
+  it("accepts both channels together", () => {
+    const result = validateRuntimeEnvValues({
+      TELEGRAM_BOT_TOKEN: "123456:abcdef",
+      TELEGRAM_ALLOWED_USER_ID: "123456789",
+      WHATSAPP_ENABLED: "true",
+      WHATSAPP_ALLOWED_NUMBER: "34666999999",
+      OPENCODE_MODEL_PROVIDER: "opencode",
+      OPENCODE_MODEL_ID: "big-pickle",
+    });
+
+    expect(result).toEqual({ isValid: true });
+  });
+
+  it("rejects empty config with no channel", () => {
+    const result = validateRuntimeEnvValues({
+      OPENCODE_MODEL_PROVIDER: "opencode",
+      OPENCODE_MODEL_ID: "big-pickle",
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.reason).toContain("No messaging channel");
+  });
+
+  it("rejects partial Telegram (token without user id) even when WhatsApp is missing", () => {
+    const result = validateRuntimeEnvValues({
+      TELEGRAM_BOT_TOKEN: "123456:abcdef",
+      OPENCODE_MODEL_PROVIDER: "opencode",
+      OPENCODE_MODEL_ID: "big-pickle",
+    });
+
+    expect(result.isValid).toBe(false);
+    // Either of the two-error messages is acceptable: the inconsistency
+    // message OR the missing-channel message. The point is the validator
+    // doesn't silently accept a half-configured Telegram.
+    expect(result.reason).toMatch(/TELEGRAM|messaging channel/);
+  });
+
   it("falls back to flat updates when template is unavailable", () => {
     const existingContent = [
       "CUSTOM_FLAG=enabled",
