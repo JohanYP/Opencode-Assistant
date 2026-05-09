@@ -6,6 +6,7 @@ import { isTtsConfigured, synthesizeSpeech } from "../../tts/client.js";
 import { logger } from "../../utils/logger.js";
 import { collectResponseText, type ResponsePart } from "../utils/response-text.js";
 import { chunkForWhatsApp } from "../utils/chunking.js";
+import { mp3ToOpusOgg } from "../utils/audio-convert.js";
 import type { WhatsAppCommandContext } from "../commands/types.js";
 
 // Tracks whether a session is currently being prompted from WhatsApp so a
@@ -84,7 +85,24 @@ export async function handlePromptText(
       // they already received. Log and move on.
       try {
         const audio = await synthesizeSpeech(responseText);
-        await ctx.bot.sendAudio(ctx.jid, audio.buffer, { mimeType: audio.mimeType });
+        // Try to deliver as a real WhatsApp voice note (push-to-talk with
+        // waveform) — that requires OGG/Opus, which TTS providers don't
+        // emit directly. Transcode via ffmpeg. If anything in the
+        // pipeline fails (no ffmpeg in container, weird MP3 from the
+        // provider, etc.) fall back to a plain music-player audio so the
+        // user still hears the reply.
+        try {
+          const opusBytes = await mp3ToOpusOgg(audio.buffer);
+          await ctx.bot.sendVoice(ctx.jid, opusBytes, {
+            mimeType: "audio/ogg; codecs=opus",
+          });
+        } catch (transcodeErr) {
+          logger.warn(
+            "[WhatsApp][prompt] OPUS transcode failed, sending MP3 as audio attachment",
+            transcodeErr,
+          );
+          await ctx.bot.sendAudio(ctx.jid, audio.buffer, { mimeType: audio.mimeType });
+        }
       } catch (ttsErr) {
         logger.warn("[WhatsApp][prompt] TTS failed, text reply still delivered", ttsErr);
       }

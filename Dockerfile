@@ -33,6 +33,15 @@ RUN npm prune --omit=dev
 # image — equivalent security posture to the previous --ignore-scripts.
 FROM node:20-slim
 
+# ffmpeg is needed at runtime to transcode TTS output (MP3 from the
+# providers) into OGG/Opus for WhatsApp voice notes (push-to-talk).
+# Telegram accepts the MP3 directly, but WhatsApp's voice-note format
+# requires OPUS — without this binary the bot falls back to sending
+# audio as a music-player attachment instead of a real voice note.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ENV NODE_ENV=production
