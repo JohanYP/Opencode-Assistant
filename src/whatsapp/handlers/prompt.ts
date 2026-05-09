@@ -29,7 +29,7 @@ export async function handlePromptText(
     return;
   }
 
-  const session = getCurrentSession();
+  const session = getCurrentSession("whatsapp");
   if (!session) {
     await ctx.reply("No active session. Send /new to start one.");
     return;

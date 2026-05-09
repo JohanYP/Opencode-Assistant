@@ -74,7 +74,7 @@ export const sessionsCommand: WhatsAppCommandHandler = async (ctx) => {
           title: session.title,
           directory: project.worktree,
         };
-        setCurrentSession(info);
+        setCurrentSession("whatsapp", info);
         clearAllInteractionState("whatsapp_session_switched");
 
         logger.info(

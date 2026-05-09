@@ -140,7 +140,7 @@ export async function handleRenameTextAnswer(ctx: Context): Promise<boolean> {
       throw error || new Error("Failed to update session");
     }
 
-    setCurrentSession({
+    setCurrentSession("telegram", {
       id: sessionInfo.sessionId,
       title: newTitle,
       directory: sessionInfo.directory,

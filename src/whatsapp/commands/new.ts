@@ -34,7 +34,7 @@ export const newCommand: WhatsAppCommandHandler = async (ctx) => {
       title: session.title,
       directory: project.worktree,
     };
-    setCurrentSession(info);
+    setCurrentSession("whatsapp", info);
     clearAllInteractionState("whatsapp_session_created");
     await ingestSessionInfoForCache(session);
 

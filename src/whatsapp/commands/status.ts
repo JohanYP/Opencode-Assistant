@@ -47,7 +47,7 @@ export const statusCommand: WhatsAppCommandHandler = async (ctx) => {
       lines.push("Project: _not selected_");
     }
 
-    const session = getCurrentSession();
+    const session = getCurrentSession("whatsapp");
     if (session) {
       lines.push(`Session: ${session.title}`);
     } else {

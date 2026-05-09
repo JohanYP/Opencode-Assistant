@@ -3,7 +3,10 @@ import { cloneScheduledTask, type ScheduledTask } from "../scheduled-task/types.
 import type { TtsProvider } from "../config.js";
 import path from "node:path";
 import { getRuntimePaths } from "../runtime/paths.js";
+import type { Channel } from "../messenger/channel.js";
 import { logger } from "../utils/logger.js";
+
+const DEFAULT_CHANNEL: Channel = "telegram";
 
 export interface ProjectInfo {
   id: string;
@@ -65,7 +68,24 @@ export interface UiPreferences {
 
 export interface Settings {
   currentProject?: ProjectInfo;
+  /**
+   * @deprecated Single-slot session field kept ONLY for backwards
+   * compatibility with installs that pre-date per-channel sessions.
+   * On load it is migrated into `currentSessionByChannel.telegram` and
+   * deleted from disk on the next write. New code must read/write
+   * sessions through `currentSessionByChannel`.
+   */
   currentSession?: SessionInfo;
+  /**
+   * Per-channel "currently active" sessions. Each channel keeps its own
+   * cursor so opening a session in WhatsApp doesn't pull Telegram into
+   * it (and vice versa). The OpenCode sessions themselves are global —
+   * this map only tracks which one is active where.
+   */
+  currentSessionByChannel?: {
+    telegram?: SessionInfo;
+    whatsapp?: SessionInfo;
+  };
   currentAgent?: string;
   currentModel?: ModelInfo;
   pinnedMessageId?: number;
@@ -133,17 +153,42 @@ export function clearProject(): void {
   void writeSettingsFile(currentSettings);
 }
 
-export function getCurrentSession(): SessionInfo | undefined {
-  return currentSettings.currentSession;
+/**
+ * Read the active session for a channel. Defaults to "telegram" so older
+ * call sites that never specified a channel keep behaving like before
+ * (Telegram has been the only channel until V1.x). New WhatsApp code
+ * MUST pass `"whatsapp"` explicitly — `grep "getCurrentSession()" src/whatsapp/`
+ * should be zero after migration.
+ */
+export function getCurrentSession(channel: Channel = DEFAULT_CHANNEL): SessionInfo | undefined {
+  return currentSettings.currentSessionByChannel?.[channel];
 }
 
-export function setCurrentSession(sessionInfo: SessionInfo): void {
-  currentSettings.currentSession = sessionInfo;
+/**
+ * Write the active session for a channel. The channel is REQUIRED to
+ * force every call site to declare which surface owns this session,
+ * preventing the easy bug of accidentally cross-pollinating channels.
+ */
+export function setCurrentSession(channel: Channel, sessionInfo: SessionInfo): void {
+  if (!currentSettings.currentSessionByChannel) {
+    currentSettings.currentSessionByChannel = {};
+  }
+  currentSettings.currentSessionByChannel[channel] = sessionInfo;
   void writeSettingsFile(currentSettings);
 }
 
-export function clearSession(): void {
-  currentSettings.currentSession = undefined;
+/**
+ * Clear the active session.
+ *   - With a channel: clears only that channel's cursor.
+ *   - Without arguments: clears ALL channels (used by reset / project switch).
+ */
+export function clearSession(channel?: Channel): void {
+  if (!currentSettings.currentSessionByChannel) return;
+  if (channel) {
+    delete currentSettings.currentSessionByChannel[channel];
+  } else {
+    currentSettings.currentSessionByChannel = {};
+  }
   void writeSettingsFile(currentSettings);
 }
 
@@ -269,6 +314,28 @@ export async function loadSettings(): Promise<void> {
 
   currentSettings = loadedSettings;
   currentSettings.scheduledTasks = cloneScheduledTasks(loadedSettings.scheduledTasks) ?? [];
+
+  // Migration: pre-V1.x installs only had a single `currentSession` field,
+  // shared across whichever channel ran the bot. With per-channel sessions
+  // we move that value into `currentSessionByChannel.telegram` (Telegram
+  // was the only channel until V1.x, so the assumption is safe). The old
+  // field is dropped from the on-disk file on the next write.
+  if (currentSettings.currentSession && !currentSettings.currentSessionByChannel) {
+    currentSettings.currentSessionByChannel = {
+      telegram: currentSettings.currentSession,
+    };
+    delete currentSettings.currentSession;
+    requiresRewrite = true;
+    logger.info(
+      "[SettingsManager] Migrated single-slot currentSession into " +
+        "currentSessionByChannel.telegram",
+    );
+  } else if (currentSettings.currentSession) {
+    // Both fields exist — the new one wins. Drop the legacy field so it
+    // doesn't pollute future writes.
+    delete currentSettings.currentSession;
+    requiresRewrite = true;
+  }
 
   if (requiresRewrite) {
     void writeSettingsFile(currentSettings);

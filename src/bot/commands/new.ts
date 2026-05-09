@@ -53,7 +53,7 @@ export async function newCommand(ctx: CommandContext<Context>, deps: NewCommandD
       title: session.title,
       directory: currentProject.worktree,
     };
-    setCurrentSession(sessionInfo);
+    setCurrentSession("telegram", sessionInfo);
     clearAllInteractionState("session_created");
     await ingestSessionInfoForCache(session);
 

@@ -401,7 +401,7 @@ async function ensureSessionForProject(
     directory: projectDirectory,
   };
 
-  setCurrentSession(sessionInfo);
+  setCurrentSession("telegram", sessionInfo);
   await ingestSessionInfoForCache(session);
   await ctx.reply(t("bot.session_created", { title: session.title }));
 

@@ -257,7 +257,7 @@ export async function handleSessionSelect(ctx: Context, deps: SessionSelectDeps)
       title: session.title,
       directory: currentProject.worktree,
     };
-    setCurrentSession(sessionInfo);
+    setCurrentSession("telegram", sessionInfo);
     clearAllInteractionState("session_switched");
 
     await ctx.answerCallbackQuery();

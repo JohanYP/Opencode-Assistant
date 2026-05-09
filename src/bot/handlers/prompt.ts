@@ -173,7 +173,7 @@ export async function processUserPrompt(
       directory: currentProject.worktree,
     };
 
-    setCurrentSession(currentSession);
+    setCurrentSession("telegram", currentSession);
     await ingestSessionInfoForCache(session);
     createdNewSession = true;
   } else {

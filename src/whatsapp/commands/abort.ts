@@ -15,7 +15,7 @@ export const abortCommand: WhatsAppCommandHandler = async (ctx) => {
   await cancelPendingMenu(ctx.jid);
   clearAllInteractionState("whatsapp_abort_command");
 
-  const session = getCurrentSession();
+  const session = getCurrentSession("whatsapp");
   if (!session) {
     await ctx.reply("No active session.");
     return;
