@@ -40,10 +40,12 @@ export async function handlePromptText(
     return;
   }
 
-  // Acknowledge immediately. WhatsApp doesn't have a "typing..." indicator
-  // we can rely on cross-platform, so a one-word ack tells the user the
-  // request was received while the model thinks.
-  await ctx.reply("⏳ Working on it…");
+  // Native WhatsApp "typing..." indicator instead of an ack message.
+  // WhatsApp can't edit or delete our messages the way Telegram can, so any
+  // status text we'd send ("Working on it...") would clutter the chat
+  // permanently. Presence updates show in the chat header and disappear on
+  // their own once we stop refreshing them, keeping the conversation clean.
+  await ctx.bot.sendTyping(ctx.jid, "composing");
 
   inFlightBySession.add(session.id);
 
@@ -96,5 +98,7 @@ export async function handlePromptText(
     await ctx.reply("Something went wrong while talking to the model. Try again.");
   } finally {
     inFlightBySession.delete(session.id);
+    // Clear the typing hint regardless of outcome.
+    await ctx.bot.sendTyping(ctx.jid, "paused");
   }
 }

@@ -1,5 +1,4 @@
 import { isSttConfigured, transcribeAudio } from "../../stt/client.js";
-import { config } from "../../config.js";
 import { logger } from "../../utils/logger.js";
 import type { IncomingVoice, WhatsAppBot } from "../types.js";
 import type { WhatsAppCommandContext } from "../commands/types.js";
@@ -29,16 +28,26 @@ export async function handleVoiceMessage(
     return;
   }
 
+  // Native typing indicator while we download + transcribe + run the prompt.
+  // This replaces what would otherwise be two extra messages (transcription
+  // echo + "Working on it..."). On WhatsApp those acks can't be edited or
+  // deleted, so they'd permanently clutter the chat. Presence updates
+  // disappear on their own. The prompt handler also sends its own typing
+  // hint when it picks up; calling twice is harmless.
+  await bot.sendTyping(ctx.jid, "composing");
+
   let buffer: Buffer;
   try {
     buffer = await voice.download();
   } catch (err) {
     logger.error("[WhatsApp][voice] failed to download audio", err);
+    await bot.sendTyping(ctx.jid, "paused");
     await ctx.reply("Could not download your voice note.");
     return;
   }
 
   if (buffer.length === 0) {
+    await bot.sendTyping(ctx.jid, "paused");
     await ctx.reply("That voice note was empty.");
     return;
   }
@@ -49,21 +58,21 @@ export async function handleVoiceMessage(
     text = result.text.trim();
   } catch (err) {
     logger.error("[WhatsApp][voice] transcription failed", err);
+    await bot.sendTyping(ctx.jid, "paused");
     await ctx.reply("Could not transcribe that voice note.");
     return;
   }
 
   if (!text) {
+    await bot.sendTyping(ctx.jid, "paused");
     await ctx.reply("Couldn't make out any speech in that voice note.");
     return;
   }
 
-  // Show the transcribed text unless the user explicitly hid it via the
-  // shared STT_HIDE_RECOGNIZED_TEXT setting (matches Telegram behavior).
-  if (!config.stt.hideRecognizedText) {
-    await ctx.reply(`🎙 _${text}_`);
-  }
-
-  void bot;
+  // Note: we deliberately do NOT echo "🎙 transcribed text" the way Telegram
+  // does. Telegram edits the previous status message in-place; on WhatsApp
+  // every reply is permanent, so the echo would just be noise. The user
+  // already has their voice note in chat history if they want to verify.
+  // The prompt handler will handle pause/resume of the typing indicator.
   await handlePromptText(ctx, text);
 }

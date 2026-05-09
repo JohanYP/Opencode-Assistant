@@ -120,6 +120,16 @@ export function createWhatsAppBot(): WhatsAppBot {
     await session.getSocket().sendMessage(jid, { text });
   };
 
+  const sendTyping = async (jid: string, state: "composing" | "paused"): Promise<void> => {
+    if (!session) return;
+    try {
+      await session.getSocket().sendPresenceUpdate(state, jid);
+    } catch (err) {
+      // Presence updates are cosmetic; never let them break a real reply.
+      logger.debug("[WhatsApp] sendPresenceUpdate failed (ignored)", err);
+    }
+  };
+
   const sendAudio = async (
     jid: string,
     audio: Buffer,
@@ -204,6 +214,7 @@ export function createWhatsAppBot(): WhatsAppBot {
       handlers.push(handler);
     },
     sendText,
+    sendTyping,
     sendAudio,
     sendVoice,
     sendImage,
