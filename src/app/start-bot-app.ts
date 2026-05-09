@@ -6,8 +6,9 @@ import { config } from "../config.js";
 import { opencodeAutoRestartService } from "../opencode/auto-restart.js";
 import { loadSettings } from "../settings/manager.js";
 import { scheduledTaskRuntime } from "../scheduled-task/runtime.js";
-import { setReminderBot } from "../cron/reminder.js";
+import { registerReminderTarget, setReminderBot } from "../cron/reminder.js";
 import { startCronYmlSync, stopCronYmlSync } from "../cron/yml-sync.js";
+import { startWhatsApp, stopWhatsApp } from "../whatsapp/runtime.js";
 import { warmupSessionDirectoryCache } from "../session/cache-manager.js";
 import { reconcileStoredModelSelection } from "../model/manager.js";
 import { startMemorySummaryWatcher, stopMemorySummaryWatcher } from "../memory/watcher.js";
@@ -134,6 +135,25 @@ export async function startBotApp(): Promise<void> {
   await scheduledTaskRuntime.initialize(bot);
   await startCronYmlSync();
 
+  // WhatsApp is a second optional channel. start() handles the disabled
+  // case and only fails soft (logs, returns null) so a misconfigured
+  // WhatsApp doesn't take Telegram down with it. Once it connects, register
+  // it as a reminder target so cron-driven reminders and memory backup
+  // notifications fan out to both channels.
+  void startWhatsApp()
+    .then((whatsappBot) => {
+      if (whatsappBot && config.whatsapp.allowedNumber) {
+        registerReminderTarget({
+          platform: "whatsapp",
+          bot: whatsappBot,
+          jid: config.whatsapp.allowedNumber,
+        });
+      }
+    })
+    .catch((err) => {
+      logger.error("[App] WhatsApp startup error (continuing without it)", err);
+    });
+
   let shutdownStarted = false;
   let serviceStateCleared = false;
   let shutdownTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -175,6 +195,9 @@ export async function startBotApp(): Promise<void> {
     scheduledTaskRuntime.shutdown();
     stopCronYmlSync();
     stopMemorySummaryWatcher();
+    void stopWhatsApp().catch((err) => {
+      logger.warn("[App] Failed to stop WhatsApp cleanly", err);
+    });
     if (mcpHttpHandle) {
       void mcpHttpHandle.close().catch((err) => {
         logger.warn("[App] Failed to stop MCP HTTP server cleanly", err);
@@ -228,6 +251,9 @@ export async function startBotApp(): Promise<void> {
     opencodeAutoRestartService.stop();
     scheduledTaskRuntime.shutdown();
     stopCronYmlSync();
+    await stopWhatsApp().catch((err) => {
+      logger.warn("[App] Failed to stop WhatsApp cleanly on exit", err);
+    });
     await clearManagedServiceState().catch((error) => {
       logger.warn("[App] Failed to clear managed service state", error);
     });

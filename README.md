@@ -49,7 +49,7 @@ Honest comparison. Bold cells are where we **actually** win; the rest is context
 | **07 Localization (UI)** | 🌍 **6 languages** (en/es/de/fr/ru/zh) | 🇬🇧 English | 🇬🇧 English | 🇬🇧 English | 🇬🇧 English | 🇬🇧 English | Multi |
 | **08 Setup time** | ⚡ **`./setup.sh` (≈10 min)** | App install | Build from source | `pip install` | `pip install` | `pip install` | App install |
 | **09 Self-hosted** | ✅ Docker, one command | ✅ | ✅ Docker | ✅ | ✅ | ✅ | ❌ Cloud |
-| **10 Channel adapters** | 🟡 **Telegram only (mobile-focused)** | ~13 (Slack, Discord, etc.) | 40 (multi-channel framework) | Plugin-based | None native | None native | Native client |
+| **10 Channel adapters** | 🟡 **Telegram + optional WhatsApp** ([setup](docs/WHATSAPP_SETUP.md)) | ~13 (Slack, Discord, etc.) | 40 (multi-channel framework) | Plugin-based | None native | None native | Native client |
 | **11 Production hardening** | Single-user whitelist | Basic | 16 security layers + WASM sandbox | Docker | AES enc. | Checkpoints | Cloud-managed |
 | **12 Language** | TypeScript | TypeScript | Rust | Python | Python | Python | — (closed) |
 | **13 License** | MIT | MIT | MIT | MIT | Apache 2.0 | MIT | Closed |

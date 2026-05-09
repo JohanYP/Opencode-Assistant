@@ -30,6 +30,10 @@ services:
     volumes:
       - ./memory:/app/memory
       - bot-data:/app/data
+      # Persists Baileys auth state so WhatsApp doesn't need a new QR
+      # scan on every `docker compose up -d --build`. Only used when
+      # WHATSAPP_ENABLED=true; harmless otherwise.
+      - whatsapp-auth:/app/data/whatsapp-auth
     env_file: .env
     # Lets the bot reach services running on the VPS host (e.g. an
     # Ollama install for the optional vector memory). Harmless when
@@ -48,3 +52,4 @@ volumes:
   opencode-npm:
   opencode-pip:
   bot-data:
+  whatsapp-auth:

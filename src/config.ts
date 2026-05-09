@@ -86,6 +86,11 @@ export interface AppConfig {
     apiKey: string;
     enabled: boolean;
   };
+  whatsapp: {
+    enabled: boolean;
+    allowedNumber: string;
+    authDir: string;
+  };
 }
 
 let cachedConfig: AppConfig | null = null;
@@ -311,6 +316,20 @@ export function loadConfig(): AppConfig {
         model: getEnvVar("EMBEDDING_MODEL", false) || "text-embedding-3-small",
         apiKey: getEnvVar("EMBEDDING_API_KEY", false),
         enabled: baseUrl.length > 0,
+      };
+    })(),
+    whatsapp: (() => {
+      const enabled = getOptionalBooleanEnvVar("WHATSAPP_ENABLED", false);
+      const rawNumber = (getEnvVar("WHATSAPP_ALLOWED_NUMBER", false) || "").trim();
+      // Accept either a bare phone number (digits, optionally with leading "+")
+      // or a full JID. Normalize to the JID form Baileys uses internally so
+      // whitelist checks compare apples to apples.
+      const digits = rawNumber.replace(/[^\d]/g, "");
+      const allowedNumber = digits.length > 0 ? `${digits}@s.whatsapp.net` : "";
+      return {
+        enabled,
+        allowedNumber,
+        authDir: getEnvVar("WHATSAPP_AUTH_DIR", false) || "./data/whatsapp-auth",
       };
     })(),
   };
