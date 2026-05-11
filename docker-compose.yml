@@ -15,9 +15,18 @@ services:
       # PATH, so user-installed Python tools are immediately runnable.
       - opencode-pip:/root/.local
     environment:
-      # The opencode-entrypoint.sh writes mcp.json based on this URL so
-      # OpenCode automatically discovers the bot's memory MCP server.
+      # The opencode-entrypoint.sh writes opencode.json based on this URL
+      # so OpenCode automatically discovers the bot's memory MCP server.
       - ASSISTANT_MEMORY_MCP_URL=http://bot:4097/mcp
+    # Pull any MCP_URL_* env vars from the user's .env file. Each one
+    # registers an additional remote MCP server in opencode.json. See
+    # docs/MCP_INTEGRATION.md for the supported pattern (e.g.
+    # MCP_URL_PLAYLIST_CURATOR=http://host.docker.internal:4098/mcp).
+    env_file: .env
+    # Let OpenCode reach MCP servers running on the host (e.g.
+    # playlist-curator-mcp). Harmless when unused.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       bot:
         condition: service_started
