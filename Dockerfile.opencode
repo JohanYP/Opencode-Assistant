@@ -25,7 +25,17 @@ RUN apt-get update \
 # stays in the image layer and gets refreshed on each `--build`. The
 # user-installed packages further down go to a separate prefix backed
 # by a volume.
-RUN npm install -g opencode-ai@latest
+#
+# Pinned to 1.15.0 — the first release of the new Effect-based core
+# event system. Migration required one bot-side fix: in v1.15.0 the
+# `message.part.delta` event ships `field: "text"` for BOTH text-deltas
+# and reasoning-deltas (the field refers to the Part schema slot, not
+# the Part type). aggregator.ts now discriminates by partID lookup
+# against `knownTextPartIds` (populated from `message.part.updated`)
+# instead of trusting the delta event. The SDK was bumped to 1.15.0 in
+# the same migration. Before bumping further: re-run `npx tsc --noEmit`
+# after `npm install` and verify a real voice round-trip end-to-end.
+RUN npm install -g opencode-ai@1.15.0
 
 # Switch npm's global prefix to a path that is mounted as a volume in
 # docker-compose.yml (opencode-npm). Anything the user installs via

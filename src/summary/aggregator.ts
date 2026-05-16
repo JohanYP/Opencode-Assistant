@@ -49,6 +49,9 @@ type ExternalUserInputCallback = (
 interface MessagePartDeltaEventRaw {
   type: "message.part.delta";
   properties: {
+    // v1.15.0 shape: flat fields with `field` as the part-type discriminator.
+    // Legacy `part` / `type` kept as optional for resilience if the server
+    // ever emits the old shape (e.g. through the v2→v1 bridge).
     part?: {
       id?: string;
       sessionID?: string;
@@ -59,6 +62,7 @@ interface MessagePartDeltaEventRaw {
     sessionID?: string;
     messageID?: string;
     partID?: string;
+    field?: string;
     type?: string;
     delta?: string;
   };
@@ -781,33 +785,29 @@ class SummaryAggregator {
     const sessionID = part?.sessionID || event.properties.sessionID;
     const messageID = part?.messageID || event.properties.messageID;
     const partID = part?.id || event.properties.partID || "text";
-    const partType = part?.type || event.properties.type;
     const delta = event.properties.delta;
 
     if (!sessionID || !messageID || typeof delta !== "string" || delta.length === 0) {
       return;
     }
 
-    if (partType && partType !== "text") {
+    // v1.15.0 emits `field: "text"` for BOTH text-deltas and reasoning-deltas
+    // (the field refers to the Part schema's `.text` slot, not the Part's type).
+    // So we cannot use the delta event to discriminate part type — rely on
+    // `knownTextPartIds`, which `handleMessagePartUpdated` populates from
+    // `message.part.updated.properties.part.type === "text"`. That is the
+    // real Part-type discriminator and fires before deltas for the same part.
+    const knownTextIds = this.knownTextPartIds.get(messageID);
+    const isKnownTextPart = knownTextIds?.has(partID) ?? false;
+    const thinkingFired = this.thinkingFiredForMessages.has(messageID);
+
+    if (thinkingFired && !isKnownTextPart) {
       return;
     }
 
-    if (partType === "text") {
+    if (!thinkingFired && !isKnownTextPart) {
       this.registerKnownTextPart(messageID, partID);
       this.registerTextPart(messageID, partID);
-    } else {
-      const knownTextIds = this.knownTextPartIds.get(messageID);
-      const isKnownTextPart = knownTextIds?.has(partID) ?? false;
-      const thinkingFired = this.thinkingFiredForMessages.has(messageID);
-
-      if (thinkingFired && !isKnownTextPart) {
-        return;
-      }
-
-      if (!thinkingFired && !isKnownTextPart) {
-        this.registerKnownTextPart(messageID, partID);
-        this.registerTextPart(messageID, partID);
-      }
     }
 
     this.applyTextDelta(sessionID, messageID, partID, delta, part?.text);
